@@ -42,9 +42,6 @@ const AppContent = () => {
     return <InternoDashboard onBack={() => setSelectedDashboard(null)} />;
   }
 
-  if (selectedDashboard === 'gdash') {
-    return <GDash onBack={() => setSelectedDashboard(null)} />;
-  }
 
   return (
     <ExpenseProvider>
