@@ -63,10 +63,11 @@ export const supabase = {
                   })
                 });
                 
-                if (!response.ok) {
-                  throw new Error(`HTTP error! status: ${response.status}`);
+              if (!response.ok) {
+                  const errorDetails = await response.text();
+                  console.error("ERRO EXATO DO BANCO:", errorDetails);
+                  throw new Error(`HTTP error! status: ${response.status} - Detalhes: ${errorDetails}`);
                 }
-                
                 const result = await response.json();
                 resolve(result);
               } catch (error) {
