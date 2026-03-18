@@ -7,7 +7,6 @@ import {
 } from 'recharts';
 import { useInternoDashboard } from '../hooks/useInternoDashboard';
 import { DateRangePicker, DateRange } from '../components/DateRangePicker';
-import { DebugSupabase } from '../components/DebugSupabase';
 
 interface Props {
   onBack: () => void;
@@ -329,7 +328,6 @@ export default function InternoDashboard({ onBack }: Props) {
       </div>
 
       <main className="flex-1 p-6 overflow-y-auto">
-        <DebugSupabase />
         {activeTab === 'gerais' && (
           <div className="space-y-6 max-w-7xl mx-auto">
             {/* Top Row */}
