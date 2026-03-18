@@ -16,7 +16,6 @@ import InstitucionalEntry from './pages/InstitucionalEntry';
 import Timeline from './pages/Timeline';
 import DashboardSelection from './pages/DashboardSelection';
 import InternoDashboard from './pages/InternoDashboard';
-import GDash from './pages/GDash';
 import { TransactionModal } from './components/TransactionModal';
 import { CommercialModal } from './components/CommercialModal';
 
