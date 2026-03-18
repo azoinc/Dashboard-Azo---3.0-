@@ -81,9 +81,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
         if (filters.competence && filters.competence !== 'Atual') {
           let snapshotQuery = supabase
             .from('view_lead_snapshot_mensal')
-            .select('status_final_mes, id_cv, data_criacao_cv, origem, corretor, empreendimento')
-            .gte('data_criacao_cv', startDateStr)
-            .lte('data_criacao_cv', endDateStr)
+            .select('status_final_mes, id_cv, lead_data_cad, origem, corretor, empreendimento')
+            .gte('lead_data_cad', startDateStr)
+            .lte('lead_data_cad', endDateStr)
             .eq('competencia_data', filters.competence);
 
           if (filters.project !== 'Todos') {
@@ -215,8 +215,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
           let funnelQuery = supabase
             .from('view_funil_maximo_com_total')
             .select('etapa_visual, lead_id')
-            .gte('data_criacao_cv', startDateStr)
-            .lte('data_criacao_cv', endDateStr);
+            .gte('safra_data', startDateStr)
+            .lte('safra_data', endDateStr);
 
           if (filters.project !== 'Todos') {
             funnelQuery = funnelQuery.eq('empreendimento', filters.project);
