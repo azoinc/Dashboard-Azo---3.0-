@@ -20,7 +20,7 @@ export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : nul
 export const auth = getAuth(app);
 
 // Use a specific database ID if provided, otherwise default to azo-dash-3-0
-const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID || "azo-dash-3-0";
-export const db = getFirestore(app, databaseId);
+//const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID || "azo-dash-3-0";
+export const db = getFirestore(app);
 
 export const storage = getStorage(app);
