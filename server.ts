@@ -4,10 +4,10 @@ const { Pool } = pg;
 
 const pool = new Pool({
   host: process.env.SP_HOST,
-  database: "postgres", // Se quiser, pode colocar process.env.SP_DATABASE também
-  user: process.env.SP_USER,       // SEM ASPAS!
-  password: process.env.SP_PS,     // SEM ASPAS!
-  port: Number(process.env.SP_PORT) || 6543, // Convertido para número (com fallback para 6543)
+  database: "postgres", 
+  user: process.env.SP_USER,       
+  password: process.env.SP_PS,    
+  port: Number(process.env.SP_PORT) || 6543, 
   ssl: {
     rejectUnauthorized: false
   }
