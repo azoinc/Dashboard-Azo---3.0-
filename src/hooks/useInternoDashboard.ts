@@ -271,12 +271,12 @@ export function useInternoDashboard(filters: DashboardFilters) {
             // Milestones
             const { data: milestonesData } = await supabase
               .from('lead_milestones')
-              .select('lead_id, para_fase')
+              .select('lead_id, para_nome')
               .in('lead_id', chunk);
               
             if (milestonesData) {
               milestonesData.forEach(m => {
-                const fase = m.para_fase?.toLowerCase() || '';
+                const fase = m.para_nome?.toLowerCase() || '';
                 let score = 0;
                 if (fase.includes('visita')) score = 2;
                 else if (fase.includes('agendamento') || fase.includes('agendado')) score = 1;
