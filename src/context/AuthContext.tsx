@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../services/firebase';
 import { onAuthStateChanged, User, signOut as firebaseSignOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { UserRole } from '../types';
 
 interface AuthContextType {
@@ -23,14 +23,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(firebaseUser);
       if (firebaseUser) {
         try {
-          console.log("Checking role for UID:", firebaseUser.uid);
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          console.log("Document exists?", userDoc.exists());
-          if (userDoc.exists()) {
+          console.log("Checking role for email:", firebaseUser.email);
+          const q = query(collection(db, 'users'), where('email', '==', firebaseUser.email));
+          const querySnapshot = await getDocs(q);
+          
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
             console.log("Document data:", userDoc.data());
             setUserRole(userDoc.data().role as UserRole);
           } else {
-            console.warn("No user document found for this UID in the 'users' collection.");
+            console.warn("No user document found for this email in the 'users' collection.");
             setUserRole(null);
           }
         } catch (error) {
