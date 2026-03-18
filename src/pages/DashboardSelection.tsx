@@ -51,23 +51,6 @@ export default function DashboardSelection({ onSelect }: Props) {
               Acompanhamento de métricas internas, equipe e processos do departamento de marketing.
             </p>
           </button>
-
-          {/* GDash */}
-          <button
-            onClick={() => onSelect('gdash')}
-            className="group relative bg-white p-8 rounded-3xl shadow-sm border border-slate-200 hover:border-blue-500 hover:shadow-md transition-all text-left overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-8 opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">
-              <ArrowRight className="text-blue-500" size={24} />
-            </div>
-            <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-              <LayoutDashboard className="text-blue-600" size={32} />
-            </div>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">GDash</h2>
-            <p className="text-slate-500">
-              Visão consolidada de todos os gráficos do dashboard interno.
-            </p>
-          </button>
         </div>
       </div>
     </div>
