@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useExpense } from '../context/ExpenseContext';
 import { PUBLICIDADE_CATEGORIES, MANUTENCAO_STAND_CATEGORIES, INSTITUCIONAL_CATEGORIES, PROJECTS_BY_CITY, ALL_PROJECTS } from '../types';
 import { formatCurrency, MONTHS } from '../utils';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, ComposedChart, Line } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, Target, Users, ShoppingCart, Percent, Activity } from 'lucide-react';
 import { allCommercialProjects } from '../data/commercialProjects';
+import { useInternoDashboard } from '../hooks/useInternoDashboard';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'];
 
@@ -35,6 +36,42 @@ const PROJECT_COLORS: Record<string, string> = {
 export default function Dashboard() {
   const { data, currentMonthData, selectedCity, selectedProject, filteredTransactions, transactions, timelineEvents, selectedMonthId, filteredCommercialRecords } = useExpense();
 
+  const isAllMonths = selectedMonthId.endsWith('-ALL');
+  const [yearStr, monthStr] = selectedMonthId.split('-');
+  const year = parseInt(yearStr);
+  const month = parseInt(monthStr);
+
+  const dashboardFilters = useMemo(() => {
+    let period = 'Personalizado';
+    let startDate = '';
+    let endDate = '';
+
+    if (isAllMonths) {
+      if (yearStr === 'ALL') {
+        period = 'Todo o período';
+      } else {
+        startDate = `${year}-01-01`;
+        endDate = `${year}-12-31`;
+      }
+    } else {
+      startDate = `${year}-${monthStr}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      endDate = `${year}-${monthStr}-${lastDay.toString().padStart(2, '0')}`;
+    }
+
+    return {
+      period,
+      startDate,
+      endDate,
+      project: selectedProject === 'ALL' ? 'Todos' : selectedProject,
+      city: selectedCity,
+      broker: 'Todos',
+      competence: 'Atual'
+    };
+  }, [selectedMonthId, selectedProject, selectedCity, isAllMonths, yearStr, monthStr, year, month]);
+
+  const { totalLeads: fetchedLeads, hottestStatusData } = useInternoDashboard(dashboardFilters);
+
   if (!currentMonthData) return <div>Carregando...</div>;
 
   const totalPublicidade = PUBLICIDADE_CATEGORIES.reduce((acc, cat) => acc + filteredTransactions.filter(t => t.category === cat).reduce((sum, t) => sum + t.amount, 0), 0);
@@ -47,13 +84,13 @@ export default function Dashboard() {
   let budgetStand = 0;
   let budgetInst = 0;
   let budgetProdutos = 0;
-  let totalLeads = 0;
+  let totalLeads = fetchedLeads || 0;
   let totalVendas = 0;
   let totalVGV = 0;
   let totalVgvProduto = 0;
   let totalEstoque = 0;
   let totalMetaVendas = 0;
-  let totalVisitasOn = 0;
+  let totalVisitasOn = hottestStatusData?.visita || 0;
   let totalVisitasOff = 0;
 
   const projectsToInclude = selectedProject !== 'ALL' 
@@ -89,8 +126,6 @@ export default function Dashboard() {
 
     const comm = currentMonthData.commercial[p];
     if (comm) {
-      totalLeads += comm.leads || 0;
-      totalVisitasOn += comm.visitasOn || 0;
       totalVisitasOff += comm.visitasOff || 0;
     }
   });
@@ -166,9 +201,7 @@ export default function Dashboard() {
     }
   }
 
-  const isAllMonths = selectedMonthId.endsWith('-ALL');
   const currentMonthEvents = isAllMonths ? [] : timelineEvents.filter(e => e.date.startsWith(selectedMonthId)).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  const [year, month] = selectedMonthId.split('-').map(Number);
   const daysInMonth = isAllMonths ? 0 : new Date(year, month, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
