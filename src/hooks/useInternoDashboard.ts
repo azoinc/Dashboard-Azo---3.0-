@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { PROJECTS_BY_CITY } from '../types';
 
 export interface DashboardFilters {
   period: string;
@@ -8,6 +9,7 @@ export interface DashboardFilters {
   startDate?: string;
   endDate?: string;
   competence?: string;
+  city?: string;
 }
 
 export function useInternoDashboard(filters: DashboardFilters) {
@@ -74,6 +76,18 @@ export function useInternoDashboard(filters: DashboardFilters) {
         const startDateStr = formatYYYYMMDD(startDate);
         const endDateStr = formatYYYYMMDD(endDate);
 
+        const applyProjectFilter = (query: any) => {
+          if (filters.project !== 'Todos') {
+            return query.eq('empreendimento', filters.project);
+          } else if (filters.city && filters.city !== 'ALL') {
+            const cityProjects = PROJECTS_BY_CITY[filters.city as keyof typeof PROJECTS_BY_CITY];
+            if (cityProjects && cityProjects.length > 0) {
+              return query.in('empreendimento', cityProjects);
+            }
+          }
+          return query;
+        };
+
         // 1. Fetch current leads status (for the first chart and total leads)
         // Adjust column names based on your actual 'leads' table schema
         let leadsData: any[] | null = [];
@@ -86,9 +100,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
             .lte('lead_data_cad', endDateStr)
             .eq('competencia_data', filters.competence);
 
-          if (filters.project !== 'Todos') {
-            snapshotQuery = snapshotQuery.eq('empreendimento', filters.project);
-          }
+          snapshotQuery = applyProjectFilter(snapshotQuery);
           if (filters.broker !== 'Todos') {
             snapshotQuery = snapshotQuery.eq('corretor', filters.broker);
           }
@@ -113,9 +125,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
             .gte('data_criacao_cv', startDateStr)
             .lte('data_criacao_cv', endDateStr);
 
-          if (filters.project !== 'Todos') {
-            leadsQuery = leadsQuery.eq('empreendimento', filters.project);
-          }
+          leadsQuery = applyProjectFilter(leadsQuery);
           if (filters.broker !== 'Todos') {
             leadsQuery = leadsQuery.eq('corretor', filters.broker);
           }
@@ -218,9 +228,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
             .gte('safra_data', startDateStr)
             .lte('safra_data', endDateStr);
 
-          if (filters.project !== 'Todos') {
-            funnelQuery = funnelQuery.eq('empreendimento', filters.project);
-          }
+          funnelQuery = applyProjectFilter(funnelQuery);
           if (filters.broker !== 'Todos') {
             funnelQuery = funnelQuery.eq('corretor', filters.broker);
           }
@@ -367,9 +375,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
           .from('view_tma_fila_atendimento')
           .select('*');
           
-        if (filters.project !== 'Todos') {
-          tmaQuery = tmaQuery.eq('empreendimento', filters.project);
-        }
+        tmaQuery = applyProjectFilter(tmaQuery);
         if (filters.broker !== 'Todos') {
           tmaQuery = tmaQuery.eq('corretor', filters.broker);
         }
@@ -394,9 +400,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
           .from('view_esforco_corretor')
           .select('*');
           
-        if (filters.project !== 'Todos') {
-          actionsQuery = actionsQuery.eq('empreendimento', filters.project);
-        }
+        actionsQuery = applyProjectFilter(actionsQuery);
         if (filters.broker !== 'Todos') {
           actionsQuery = actionsQuery.eq('corretor', filters.broker);
         }
