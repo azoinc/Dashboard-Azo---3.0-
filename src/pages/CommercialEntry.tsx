@@ -6,6 +6,8 @@ import { MONTHS, formatCurrency, matchProject, getCityForProject } from '../util
 import { Project, SaleRecord, PipelineRecord, City, PROJECTS_BY_CITY, CommercialRecord } from '../types';
 import { supabase } from '../lib/supabase';
 
+import { AnnualOverview } from '../components/AnnualOverview';
+
 export default function CommercialEntry() {
   const { data, currentMonthData, selectedProject, updateCommercialData, addCommercialMetrics, setIsCommercialModalOpen, filteredCommercialRecords, deleteCommercialRecord, addCommercialRecords, addMonth, syncSupabaseData, selectedMonthId } = useExpense();
   
@@ -334,6 +336,8 @@ export default function CommercialEntry() {
           </button>
         </div>
       </header>
+
+      <AnnualOverview />
 
       {selectedProject === 'ALL' ? (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl shadow-sm">
