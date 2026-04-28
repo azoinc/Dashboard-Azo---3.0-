@@ -114,7 +114,7 @@ export const AnnualOverview = () => {
           </div>
           <div>
             <p className="text-sm font-medium text-slate-500">Meta Anual (VGV)</p>
-            <h4 className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(totalGeral.target.vgv)}</h4>
+            <h4 className="text-[0.9rem] font-bold text-slate-800 mt-1">{formatCurrency(totalGeral.target.vgv)}</h4>
             <p className="text-xs text-slate-400 mt-1">{totalGeral.target.unid} unidades no total</p>
           </div>
         </div>
@@ -125,7 +125,7 @@ export const AnnualOverview = () => {
           </div>
           <div>
             <p className="text-sm font-medium text-slate-500">Realizado (VGV)</p>
-            <h4 className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(totalGeral.total.vgv)}</h4>
+            <h4 className="text-[0.9rem] font-bold text-slate-800 mt-1">{formatCurrency(totalGeral.total.vgv)}</h4>
             <p className="text-xs text-emerald-600 font-medium mt-1">
               {((totalGeral.total.vgv / totalGeral.target.vgv) * 100).toFixed(1)}% da meta de VGV
             </p>
@@ -138,7 +138,7 @@ export const AnnualOverview = () => {
           </div>
           <div>
             <p className="text-sm font-medium text-slate-500">Unidades Vendidas</p>
-            <h4 className="text-2xl font-bold text-slate-800 mt-1">
+            <h4 className="text-[0.9rem] font-bold text-slate-800 mt-1">
               {totalGeral.total.unid} <span className="text-lg text-slate-400 font-medium">/ {totalGeral.target.unid}</span>
             </h4>
             <div className="w-full h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
@@ -156,7 +156,7 @@ export const AnnualOverview = () => {
           </div>
           <div>
             <p className="text-sm font-medium text-slate-500">VSO Geral</p>
-            <h4 className="text-2xl font-bold text-slate-800 mt-1">{totalGeral.vso}%</h4>
+            <h4 className="text-[0.9rem] font-bold text-slate-800 mt-1">{totalGeral.vso}%</h4>
             <p className="text-xs text-slate-400 mt-1">Velocidade de Vendas sobre Oferta</p>
           </div>
         </div>
