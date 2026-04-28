@@ -1,41 +1,69 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { formatCurrency } from '../utils';
 import { Target, TrendingUp, Building2, BarChart3, ChevronDown, ChevronRight } from 'lucide-react';
 import { ProjectData, spProjects, rjProjects } from '../data/commercialProjects';
+import { useExpense } from '../context/ExpenseContext';
+import { SaleRecord } from '../types';
 
-const calculateTotal = (projects: ProjectData[]): ProjectData => {
+interface ProjectRealized {
+  q1: { vendas: number; vgvRealizado: number };
+  q2: { vendas: number; vgvRealizado: number };
+  q3: { vendas: number; vgvRealizado: number };
+  q4: { vendas: number; vgvRealizado: number };
+  totalRealized: { vendas: number; vgvRealizado: number };
+}
+
+type ProjectCombined = ProjectData & ProjectRealized;
+
+const calculateTotal = (projects: ProjectCombined[]): ProjectCombined => {
   return projects.reduce((acc, curr) => ({
     name: 'Total',
     target: { unid: acc.target.unid + curr.target.unid, vgv: acc.target.vgv + curr.target.vgv },
-    q1: { unid: acc.q1.unid + curr.q1.unid, vgv: acc.q1.vgv + curr.q1.vgv },
-    q2: { unid: acc.q2.unid + curr.q2.unid, vgv: acc.q2.vgv + curr.q2.vgv },
-    q3: { unid: acc.q3.unid + curr.q3.unid, vgv: acc.q3.vgv + curr.q3.vgv },
-    q4: { unid: acc.q4.unid + curr.q4.unid, vgv: acc.q4.vgv + curr.q4.vgv },
-    total: { unid: acc.total.unid + curr.total.unid, vgv: acc.total.vgv + curr.total.vgv },
+    q1: { 
+      unid: acc.q1.unid + curr.q1.unid, 
+      vgv: acc.q1.vgv + curr.q1.vgv,
+      vendas: acc.q1.vendas + curr.q1.vendas,
+      vgvRealizado: acc.q1.vgvRealizado + curr.q1.vgvRealizado 
+    },
+    q2: { 
+      unid: acc.q2.unid + curr.q2.unid, 
+      vgv: acc.q2.vgv + curr.q2.vgv,
+      vendas: acc.q2.vendas + curr.q2.vendas,
+      vgvRealizado: acc.q2.vgvRealizado + curr.q2.vgvRealizado 
+    },
+    q3: { 
+      unid: acc.q3.unid + curr.q3.unid, 
+      vgv: acc.q3.vgv + curr.q3.vgv,
+      vendas: acc.q3.vendas + curr.q3.vendas,
+      vgvRealizado: acc.q3.vgvRealizado + curr.q3.vgvRealizado 
+    },
+    q4: { 
+      unid: acc.q4.unid + curr.q4.unid, 
+      vgv: acc.q4.vgv + curr.q4.vgv,
+      vendas: acc.q4.vendas + curr.q4.vendas,
+      vgvRealizado: acc.q4.vgvRealizado + curr.q4.vgvRealizado 
+    },
+    total: { 
+      unid: acc.total.unid + curr.total.unid, 
+      vgv: acc.total.vgv + curr.total.vgv 
+    },
+    totalRealized: {
+      vendas: acc.totalRealized.vendas + curr.totalRealized.vendas,
+      vgvRealizado: acc.totalRealized.vgvRealizado + curr.totalRealized.vgvRealizado
+    },
     vso: 0 // Calculated later
   }), {
     name: 'Total',
     target: { unid: 0, vgv: 0 },
-    q1: { unid: 0, vgv: 0 },
-    q2: { unid: 0, vgv: 0 },
-    q3: { unid: 0, vgv: 0 },
-    q4: { unid: 0, vgv: 0 },
+    q1: { unid: 0, vgv: 0, vendas: 0, vgvRealizado: 0 },
+    q2: { unid: 0, vgv: 0, vendas: 0, vgvRealizado: 0 },
+    q3: { unid: 0, vgv: 0, vendas: 0, vgvRealizado: 0 },
+    q4: { unid: 0, vgv: 0, vendas: 0, vgvRealizado: 0 },
     total: { unid: 0, vgv: 0 },
+    totalRealized: { vendas: 0, vgvRealizado: 0 },
     vso: 0
-  });
+  } as ProjectCombined);
 };
-
-const totalSP = calculateTotal(spProjects);
-totalSP.name = 'São Paulo';
-totalSP.vso = Math.round((totalSP.total.unid / totalSP.target.unid) * 100);
-
-const totalRJ = calculateTotal(rjProjects);
-totalRJ.name = 'Rio de Janeiro';
-totalRJ.vso = Math.round((totalRJ.total.unid / totalRJ.target.unid) * 100);
-
-const totalGeral = calculateTotal([totalSP, totalRJ]);
-totalGeral.name = 'Total Geral';
-totalGeral.vso = Math.round((totalGeral.total.unid / totalGeral.target.unid) * 100);
 
 const formatVGV = (value: number) => {
   if (value === 0) return '-';
@@ -45,8 +73,92 @@ const formatVGV = (value: number) => {
 export const AnnualOverview = () => {
   const [expandedSP, setExpandedSP] = useState(true);
   const [expandedRJ, setExpandedRJ] = useState(true);
+  
+  const { commercialRecords, selectedYear, selectedMonthId, selectedCity, selectedProject, isAllMonths } = useExpense();
 
-  const renderRow = (project: ProjectData, isTotal = false, isGrandTotal = false) => {
+  const { combinedSP, combinedRJ, totalSP, totalRJ, totalGeral } = useMemo(() => {
+    const buildRealized = (baseProject: ProjectData): ProjectCombined => {
+        const result: ProjectRealized = {
+          q1: { vendas: 0, vgvRealizado: 0 },
+          q2: { vendas: 0, vgvRealizado: 0 },
+          q3: { vendas: 0, vgvRealizado: 0 },
+          q4: { vendas: 0, vgvRealizado: 0 },
+          totalRealized: { vendas: 0, vgvRealizado: 0 },
+        };
+        
+        let records = commercialRecords.filter(r => r.type === 'venda' && r.project === baseProject.name);
+        
+        if (isAllMonths) {
+            records = records.filter(r => r.date.startsWith(selectedYear));
+        } else {
+            records = records.filter(r => r.date.startsWith(selectedMonthId));
+        }
+        
+        records.forEach(r => {
+            const sale = r as SaleRecord;
+            const month = parseInt(sale.date.split('-')[1], 10);
+            const qtde = sale.qtde || 0;
+            const vgv = sale.vgvVp || sale.vgvNominal || 0;
+            
+            if (month >= 1 && month <= 3) {
+              result.q1.vendas += qtde;
+              result.q1.vgvRealizado += vgv;
+            } else if (month >= 4 && month <= 6) {
+              result.q2.vendas += qtde;
+              result.q2.vgvRealizado += vgv;
+            } else if (month >= 7 && month <= 9) {
+              result.q3.vendas += qtde;
+              result.q3.vgvRealizado += vgv;
+            } else if (month >= 10 && month <= 12) {
+              result.q4.vendas += qtde;
+              result.q4.vgvRealizado += vgv;
+            }
+            result.totalRealized.vendas += qtde;
+            result.totalRealized.vgvRealizado += vgv;
+        });
+
+        return { 
+          ...baseProject,
+          q1: { ...baseProject.q1, ...result.q1 },
+          q2: { ...baseProject.q2, ...result.q2 },
+          q3: { ...baseProject.q3, ...result.q3 },
+          q4: { ...baseProject.q4, ...result.q4 },
+          totalRealized: result.totalRealized
+        };
+    };
+
+    const spCombined = spProjects
+      .filter(p => selectedProject === 'ALL' || selectedProject === p.name)
+      .filter(p => selectedCity === 'ALL' || selectedCity === 'Campinas')
+      .map(buildRealized);
+
+    const rjCombined = rjProjects
+      .filter(p => selectedProject === 'ALL' || selectedProject === p.name)
+      .filter(p => selectedCity === 'ALL' || selectedCity === 'Rio de Janeiro')
+      .map(buildRealized);
+
+    const tSP = calculateTotal(spCombined);
+    tSP.name = 'São Paulo';
+    tSP.vso = tSP.target.unid > 0 ? Math.round((tSP.totalRealized.vendas / tSP.target.unid) * 100) : 0;
+
+    const tRJ = calculateTotal(rjCombined);
+    tRJ.name = 'Rio de Janeiro';
+    tRJ.vso = tRJ.target.unid > 0 ? Math.round((tRJ.totalRealized.vendas / tRJ.target.unid) * 100) : 0;
+
+    const tGeral = calculateTotal([tSP, tRJ]);
+    tGeral.name = 'Total Geral';
+    tGeral.vso = tGeral.target.unid > 0 ? Math.round((tGeral.totalRealized.vendas / tGeral.target.unid) * 100) : 0;
+
+    return {
+      combinedSP: spCombined,
+      combinedRJ: rjCombined,
+      totalSP: tSP,
+      totalRJ: tRJ,
+      totalGeral: tGeral
+    };
+  }, [commercialRecords, selectedYear, selectedMonthId, selectedCity, selectedProject, isAllMonths]);
+
+  const renderRow = (project: ProjectCombined, isTotal = false, isGrandTotal = false) => {
     const baseClasses = isGrandTotal 
       ? 'bg-slate-800 text-white font-bold' 
       : isTotal 
@@ -63,28 +175,38 @@ export const AnnualOverview = () => {
         </td>
         
         {/* Meta */}
-        <td className="px-4 py-3 text-center bg-slate-50/50">{project.target.unid}</td>
+        <td className="px-4 py-3 text-center bg-slate-50/50">{project.target.unid || '-'}</td>
         <td className="px-4 py-3 text-right border-r border-slate-200 bg-slate-50/50">{formatVGV(project.target.vgv)}</td>
         
         {/* Q1 */}
-        <td className="px-4 py-3 text-center">{project.q1.unid || '-'}</td>
-        <td className="px-4 py-3 text-right border-r border-slate-200">{formatVGV(project.q1.vgv)}</td>
+        <td className="px-4 py-3 text-center border-l border-slate-200">{project.q1.unid || '-'}</td>
+        <td className="px-4 py-3 text-center font-semibold text-emerald-600">{project.q1.vendas > 0 ? project.q1.vendas : '-'}</td>
+        <td className="px-4 py-3 text-right">{formatVGV(project.q1.vgv)}</td>
+        <td className="px-4 py-3 text-right border-r border-slate-200 font-semibold text-emerald-600">{formatVGV(project.q1.vgvRealizado)}</td>
         
         {/* Q2 */}
         <td className="px-4 py-3 text-center">{project.q2.unid || '-'}</td>
-        <td className="px-4 py-3 text-right border-r border-slate-200">{formatVGV(project.q2.vgv)}</td>
+        <td className="px-4 py-3 text-center font-semibold text-emerald-600">{project.q2.vendas > 0 ? project.q2.vendas : '-'}</td>
+        <td className="px-4 py-3 text-right">{formatVGV(project.q2.vgv)}</td>
+        <td className="px-4 py-3 text-right border-r border-slate-200 font-semibold text-emerald-600">{formatVGV(project.q2.vgvRealizado)}</td>
         
         {/* Q3 */}
         <td className="px-4 py-3 text-center">{project.q3.unid || '-'}</td>
-        <td className="px-4 py-3 text-right border-r border-slate-200">{formatVGV(project.q3.vgv)}</td>
+        <td className="px-4 py-3 text-center font-semibold text-emerald-600">{project.q3.vendas > 0 ? project.q3.vendas : '-'}</td>
+        <td className="px-4 py-3 text-right">{formatVGV(project.q3.vgv)}</td>
+        <td className="px-4 py-3 text-right border-r border-slate-200 font-semibold text-emerald-600">{formatVGV(project.q3.vgvRealizado)}</td>
         
         {/* Q4 */}
         <td className="px-4 py-3 text-center">{project.q4.unid || '-'}</td>
-        <td className="px-4 py-3 text-right border-r border-slate-200">{formatVGV(project.q4.vgv)}</td>
+        <td className="px-4 py-3 text-center font-semibold text-emerald-600">{project.q4.vendas > 0 ? project.q4.vendas : '-'}</td>
+        <td className="px-4 py-3 text-right">{formatVGV(project.q4.vgv)}</td>
+        <td className="px-4 py-3 text-right border-r border-slate-200 font-semibold text-emerald-600">{formatVGV(project.q4.vgvRealizado)}</td>
         
         {/* Total */}
-        <td className="px-4 py-3 text-center font-semibold bg-indigo-50/30">{project.total.unid}</td>
-        <td className="px-4 py-3 text-right font-semibold border-r border-slate-200 bg-indigo-50/30">{formatVGV(project.total.vgv)}</td>
+        <td className="px-4 py-3 text-center font-semibold bg-indigo-50/30">{project.total.unid || '-'}</td>
+        <td className="px-4 py-3 text-center font-semibold bg-indigo-50/30 text-emerald-600">{project.totalRealized.vendas > 0 ? project.totalRealized.vendas : '-'}</td>
+        <td className="px-4 py-3 text-right font-semibold bg-indigo-50/30">{formatVGV(project.total.vgv)}</td>
+        <td className="px-4 py-3 text-right font-semibold border-r border-slate-200 bg-indigo-50/30 text-emerald-600">{formatVGV(project.totalRealized.vgvRealizado)}</td>
         
         {/* VSO */}
         <td className="px-4 py-3 text-center">
@@ -125,9 +247,9 @@ export const AnnualOverview = () => {
           </div>
           <div>
             <p className="text-sm font-medium text-slate-500">Realizado (VGV)</p>
-            <h4 className="text-[0.9rem] font-bold text-slate-800 mt-1">{formatCurrency(totalGeral.total.vgv)}</h4>
+            <h4 className="text-[0.9rem] font-bold text-slate-800 mt-1">{formatCurrency(totalGeral.totalRealized.vgvRealizado)}</h4>
             <p className="text-xs text-emerald-600 font-medium mt-1">
-              {((totalGeral.total.vgv / totalGeral.target.vgv) * 100).toFixed(1)}% da meta de VGV
+              {totalGeral.target.vgv > 0 ? ((totalGeral.totalRealized.vgvRealizado / totalGeral.target.vgv) * 100).toFixed(1) : 0}% da meta de VGV
             </p>
           </div>
         </div>
@@ -139,12 +261,12 @@ export const AnnualOverview = () => {
           <div>
             <p className="text-sm font-medium text-slate-500">Unidades Vendidas</p>
             <h4 className="text-[0.9rem] font-bold text-slate-800 mt-1">
-              {totalGeral.total.unid} <span className="text-lg text-slate-400 font-medium">/ {totalGeral.target.unid}</span>
+              {totalGeral.totalRealized.vendas} <span className="text-lg text-slate-400 font-medium">/ {totalGeral.target.unid}</span>
             </h4>
             <div className="w-full h-1.5 bg-slate-100 rounded-full mt-2 overflow-hidden">
               <div 
                 className="h-full bg-blue-500 rounded-full" 
-                style={{ width: `${(totalGeral.total.unid / totalGeral.target.unid) * 100}%` }}
+                style={{ width: `${totalGeral.target.unid > 0 ? (totalGeral.totalRealized.vendas / totalGeral.target.unid) * 100 : 0}%` }}
               />
             </div>
           </div>
@@ -174,70 +296,99 @@ export const AnnualOverview = () => {
           </div>
         </div>
         
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" style={{ maxWidth: '100%' }}>
           <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-slate-600 uppercase text-xs font-semibold">
+            <thead className="bg-slate-50 text-slate-600 uppercase font-semibold" style={{ fontSize: '10px' }}>
               <tr>
-                <th rowSpan={2} className="px-4 py-3 sticky left-0 z-20 bg-slate-50 border-r border-slate-200 border-b">Empreendimento</th>
-                <th colSpan={2} className="px-4 py-2 text-center border-r border-slate-200 border-b bg-slate-100/50">Meta</th>
-                <th colSpan={2} className="px-4 py-2 text-center border-r border-slate-200 border-b">1º Tri</th>
-                <th colSpan={2} className="px-4 py-2 text-center border-r border-slate-200 border-b">2º Tri</th>
-                <th colSpan={2} className="px-4 py-2 text-center border-r border-slate-200 border-b">3º Tri</th>
-                <th colSpan={2} className="px-4 py-2 text-center border-r border-slate-200 border-b">4º Tri</th>
-                <th colSpan={2} className="px-4 py-2 text-center border-r border-slate-200 border-b bg-indigo-50/50 text-indigo-800">Total</th>
+                <th rowSpan={2} className="px-4 py-3 sticky left-0 z-20 bg-slate-50 border-r border-slate-200 border-b min-w-[200px]">Empreendimento</th>
+                <th colSpan={2} className="px-4 py-2 text-center border-r border-slate-200 border-b bg-slate-100/50">Meta Geral</th>
+                <th colSpan={4} className="px-4 py-2 text-center border-r border-slate-200 border-b">1º Tri</th>
+                <th colSpan={4} className="px-4 py-2 text-center border-r border-slate-200 border-b">2º Tri</th>
+                <th colSpan={4} className="px-4 py-2 text-center border-r border-slate-200 border-b">3º Tri</th>
+                <th colSpan={4} className="px-4 py-2 text-center border-r border-slate-200 border-b">4º Tri</th>
+                <th colSpan={4} className="px-4 py-2 text-center border-r border-slate-200 border-b bg-indigo-50/50 text-indigo-800">Total</th>
                 <th rowSpan={2} className="px-4 py-3 text-center border-b border-slate-200">VSO</th>
               </tr>
               <tr>
-                <th className="px-4 py-2 text-center border-b border-slate-200 bg-slate-100/50">Unid</th>
-                <th className="px-4 py-2 text-right border-r border-slate-200 border-b bg-slate-100/50">VGV (vp)</th>
-                <th className="px-4 py-2 text-center border-b border-slate-200">Unid</th>
-                <th className="px-4 py-2 text-right border-r border-slate-200 border-b">VGV (vp)</th>
-                <th className="px-4 py-2 text-center border-b border-slate-200">Unid</th>
-                <th className="px-4 py-2 text-right border-r border-slate-200 border-b">VGV (vp)</th>
-                <th className="px-4 py-2 text-center border-b border-slate-200">Unid</th>
-                <th className="px-4 py-2 text-right border-r border-slate-200 border-b">VGV (vp)</th>
-                <th className="px-4 py-2 text-center border-b border-slate-200">Unid</th>
-                <th className="px-4 py-2 text-right border-r border-slate-200 border-b">VGV (vp)</th>
-                <th className="px-4 py-2 text-center border-b border-slate-200 bg-indigo-50/50 text-indigo-800">Unid</th>
-                <th className="px-4 py-2 text-right border-r border-slate-200 border-b bg-indigo-50/50 text-indigo-800">VGV (vp)</th>
+                {/* Meta */}
+                <th className="px-4 py-2 text-center border-b border-slate-200 bg-slate-100/50 whitespace-nowrap">Unid</th>
+                <th className="px-4 py-2 text-right border-r border-slate-200 border-b bg-slate-100/50 whitespace-nowrap">VGV (vp)</th>
+                
+                {/* 1º Tri */}
+                <th className="px-4 py-2 text-center border-b border-slate-200 whitespace-nowrap">Meta</th>
+                <th className="px-4 py-2 text-center border-b border-slate-200 text-slate-700 whitespace-nowrap">Vendas</th>
+                <th className="px-4 py-2 text-right border-b border-slate-200 whitespace-nowrap">VGV Meta</th>
+                <th className="px-4 py-2 text-right border-r border-slate-200 border-b text-slate-700 whitespace-nowrap">VGV Realizado</th>
+                
+                {/* 2º Tri */}
+                <th className="px-4 py-2 text-center border-b border-slate-200 whitespace-nowrap">Meta</th>
+                <th className="px-4 py-2 text-center border-b border-slate-200 text-slate-700 whitespace-nowrap">Vendas</th>
+                <th className="px-4 py-2 text-right border-b border-slate-200 whitespace-nowrap">VGV Meta</th>
+                <th className="px-4 py-2 text-right border-r border-slate-200 border-b text-slate-700 whitespace-nowrap">VGV Realizado</th>
+                
+                {/* 3º Tri */}
+                <th className="px-4 py-2 text-center border-b border-slate-200 whitespace-nowrap">Meta</th>
+                <th className="px-4 py-2 text-center border-b border-slate-200 text-slate-700 whitespace-nowrap">Vendas</th>
+                <th className="px-4 py-2 text-right border-b border-slate-200 whitespace-nowrap">VGV Meta</th>
+                <th className="px-4 py-2 text-right border-r border-slate-200 border-b text-slate-700 whitespace-nowrap">VGV Realizado</th>
+                
+                {/* 4º Tri */}
+                <th className="px-4 py-2 text-center border-b border-slate-200 whitespace-nowrap">Meta</th>
+                <th className="px-4 py-2 text-center border-b border-slate-200 text-slate-700 whitespace-nowrap">Vendas</th>
+                <th className="px-4 py-2 text-right border-b border-slate-200 whitespace-nowrap">VGV Meta</th>
+                <th className="px-4 py-2 text-right border-r border-slate-200 border-b text-slate-700 whitespace-nowrap">VGV Realizado</th>
+                
+                {/* Total */}
+                <th className="px-4 py-2 text-center border-b border-slate-200 bg-indigo-50/50 text-indigo-800 whitespace-nowrap">Meta</th>
+                <th className="px-4 py-2 text-center border-b border-slate-200 bg-indigo-50/50 text-indigo-800 whitespace-nowrap">Vendas</th>
+                <th className="px-4 py-2 text-right border-b border-slate-200 bg-indigo-50/50 text-indigo-800 whitespace-nowrap">VGV Meta</th>
+                <th className="px-4 py-2 text-right border-r border-slate-200 border-b bg-indigo-50/50 text-indigo-800 whitespace-nowrap">VGV Realizado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 text-xs">
               {/* SP Section */}
-              <tr 
-                className="bg-slate-100/80 cursor-pointer hover:bg-slate-200/80 transition-colors"
-                onClick={() => setExpandedSP(!expandedSP)}
-              >
-                <td colSpan={14} className="px-4 py-3 font-bold text-slate-800 sticky left-0">
-                  <div className="flex items-center space-x-2">
-                    {expandedSP ? <ChevronDown size={18} className="text-slate-500" /> : <ChevronRight size={18} className="text-slate-500" />}
-                    <span>São Paulo</span>
-                    <span className="text-xs font-normal text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
-                      {spProjects.length} projetos
-                    </span>
-                  </div>
-                </td>
-              </tr>
-              {expandedSP && spProjects.map(p => renderRow(p))}
-              {expandedSP && renderRow(totalSP, true)}
+              {combinedSP.length > 0 && (
+                <>
+                  <tr 
+                    className="bg-slate-100/80 cursor-pointer hover:bg-slate-200/80 transition-colors"
+                    onClick={() => setExpandedSP(!expandedSP)}
+                  >
+                    <td colSpan={24} className="px-4 py-3 font-bold text-slate-800 sticky left-0">
+                      <div className="flex items-center space-x-2">
+                        {expandedSP ? <ChevronDown size={18} className="text-slate-500" /> : <ChevronRight size={18} className="text-slate-500" />}
+                        <span>São Paulo</span>
+                        <span className="text-[10px] font-normal text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                          {combinedSP.length} projetos
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                  {expandedSP && combinedSP.map(p => renderRow(p))}
+                  {expandedSP && renderRow(totalSP, true)}
+                </>
+              )}
               
               {/* RJ Section */}
-              <tr 
-                className="bg-slate-100/80 cursor-pointer hover:bg-slate-200/80 transition-colors"
-                onClick={() => setExpandedRJ(!expandedRJ)}
-              >
-                <td colSpan={14} className="px-4 py-3 font-bold text-slate-800 sticky left-0 border-t border-slate-200">
-                  <div className="flex items-center space-x-2">
-                    {expandedRJ ? <ChevronDown size={18} className="text-slate-500" /> : <ChevronRight size={18} className="text-slate-500" />}
-                    <span>Rio de Janeiro</span>
-                    <span className="text-xs font-normal text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
-                      {rjProjects.length} projetos
-                    </span>
-                  </div>
-                </td>
-              </tr>
-              {expandedRJ && rjProjects.map(p => renderRow(p))}
-              {expandedRJ && renderRow(totalRJ, true)}
+              {combinedRJ.length > 0 && (
+                <>
+                  <tr 
+                    className="bg-slate-100/80 cursor-pointer hover:bg-slate-200/80 transition-colors"
+                    onClick={() => setExpandedRJ(!expandedRJ)}
+                  >
+                    <td colSpan={24} className="px-4 py-3 font-bold text-slate-800 sticky left-0 border-t border-slate-200">
+                      <div className="flex items-center space-x-2">
+                        {expandedRJ ? <ChevronDown size={18} className="text-slate-500" /> : <ChevronRight size={18} className="text-slate-500" />}
+                        <span>Rio de Janeiro</span>
+                        <span className="text-[10px] font-normal text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                          {combinedRJ.length} projetos
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                  {expandedRJ && combinedRJ.map(p => renderRow(p))}
+                  {expandedRJ && renderRow(totalRJ, true)}
+                </>
+              )}
               
               {/* Grand Total */}
               {renderRow(totalGeral, false, true)}
@@ -248,4 +399,5 @@ export const AnnualOverview = () => {
     </div>
   );
 };
+
 
