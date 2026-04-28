@@ -551,15 +551,15 @@ export default function InternoDashboard({ onBack }: Props) {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <p className="text-slate-400 text-xs font-medium mb-1">Leads</p>
-                    <p className="text-2xl font-bold text-white">638</p>
+                    <p className="text-[0.9rem] font-bold text-white">638</p>
                   </div>
                   <div>
                     <p className="text-slate-400 text-xs font-medium mb-1">CPL</p>
-                    <p className="text-2xl font-bold text-white">R$ 120,68</p>
+                    <p className="text-[0.9rem] font-bold text-white">R$ 120,68</p>
                   </div>
                   <div>
                     <p className="text-slate-400 text-xs font-medium mb-1">Total Gasto</p>
-                    <p className="text-2xl font-bold text-white">R$ 76.992,33</p>
+                    <p className="text-[0.9rem] font-bold text-white">R$ 76.992,33</p>
                   </div>
                 </div>
               </div>
@@ -575,15 +575,15 @@ export default function InternoDashboard({ onBack }: Props) {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <p className="text-slate-400 text-xs font-medium mb-1">Conversions</p>
-                    <p className="text-2xl font-bold text-white">194</p>
+                    <p className="text-[0.9rem] font-bold text-white">194</p>
                   </div>
                   <div>
                     <p className="text-slate-400 text-xs font-medium mb-1">CPL</p>
-                    <p className="text-2xl font-bold text-white">R$ 129,91</p>
+                    <p className="text-[0.9rem] font-bold text-white">R$ 129,91</p>
                   </div>
                   <div>
                     <p className="text-slate-400 text-xs font-medium mb-1">Cost (Spend)</p>
-                    <p className="text-2xl font-bold text-white">R$ 25.202,73</p>
+                    <p className="text-[0.9rem] font-bold text-white">R$ 25.202,73</p>
                   </div>
                 </div>
               </div>
