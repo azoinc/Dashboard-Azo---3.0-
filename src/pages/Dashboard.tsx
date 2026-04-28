@@ -87,8 +87,8 @@ export default function Dashboard() {
   let budgetInst = 0;
   let budgetProdutos = 0;
   let totalLeads = fetchedLeads || 0;
-  let totalVendas = siengeData.isConfigured ? siengeData.vendas : 0;
-  let totalVGV = siengeData.isConfigured ? siengeData.vgv : 0;
+  let totalVendas = 0;
+  let totalVGV = 0;
   let totalVgvProduto = 0;
   let totalEstoque = 0;
   let totalMetaVendas = 0;
@@ -103,7 +103,7 @@ export default function Dashboard() {
 
   filteredCommercialRecords.forEach(r => {
     if (projectsToInclude.includes(r.project)) {
-      if (r.type === 'venda' && !siengeData.isConfigured) {
+      if (r.type === 'venda') {
         totalVendas += r.qtde || 0;
         totalVGV += r.vgvNominal || 0;
       }
@@ -238,14 +238,9 @@ export default function Dashboard() {
           <p className="text-[0.8rem] font-bold">{formatCurrency(totalVgvProduto)}</p>
         </div>
         <div className="bg-[#61072E] rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center relative">
-          {siengeData.isConfigured && (
-            <div className="absolute top-2 right-2 flex items-center gap-1 text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full" title="Dados do Sienge">
-              <Activity size={10} /> Sienge
-            </div>
-          )}
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">VGV Realizado</p>
           <p className="text-[0.8rem] font-bold">
-            {siengeData.loading ? <span className="animate-pulse">...</span> : formatCurrency(totalVGV)}
+            {formatCurrency(totalVGV)}
           </p>
         </div>
         <div className="bg-[#61072E] rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center">
@@ -253,14 +248,9 @@ export default function Dashboard() {
           <p className="text-[0.8rem] font-bold">{totalMetaVendas} unid.</p>
         </div>
         <div className="bg-[#61072E] rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center relative">
-          {siengeData.isConfigured && (
-            <div className="absolute top-2 right-2 flex items-center gap-1 text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full" title="Dados do Sienge">
-              <Activity size={10} /> Sienge
-            </div>
-          )}
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">Vendas Realizadas</p>
           <p className="text-[0.8rem] font-bold">
-            {siengeData.loading ? <span className="animate-pulse">...</span> : `${totalVendas} unid.`}
+            {`${totalVendas} unid.`}
           </p>
         </div>
 
