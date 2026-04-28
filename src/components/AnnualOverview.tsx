@@ -86,7 +86,23 @@ export const AnnualOverview = () => {
           totalRealized: { vendas: 0, vgvRealizado: 0 },
         };
         
-        let records = commercialRecords.filter(r => r.type === 'venda' && r.project === baseProject.name);
+        const mapProjectName = (name: string): string => {
+          switch (name) {
+            case 'Natus Home': return 'Natus';
+            case 'Ares Home': return 'Ares';
+            case 'Verter Cambuí': return 'Verter';
+            case 'Casa da Mata': return 'Casa da Mata';
+            case 'Insigna': return 'Insigna';
+            case 'Noite': return 'A Noite';
+            case 'Gávea 99': return 'Gávea';
+            case 'Ar Ipanema': return 'Ipanema';
+            default: return name;
+          }
+        };
+
+        const mappedName = mapProjectName(baseProject.name);
+        
+        let records = commercialRecords.filter(r => r.type === 'venda' && r.project === mappedName);
         
         if (isAllMonths) {
             records = records.filter(r => r.date.startsWith(selectedYear));
