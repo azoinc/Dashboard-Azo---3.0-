@@ -104,11 +104,7 @@ export const AnnualOverview = () => {
         
         let records = commercialRecords.filter(r => r.type === 'venda' && r.project === mappedName);
         
-        if (isAllMonths) {
-            records = records.filter(r => r.date.startsWith(selectedYear));
-        } else {
-            records = records.filter(r => r.date.startsWith(selectedMonthId));
-        }
+        records = records.filter(r => r.date.startsWith(selectedYear));
         
         records.forEach(r => {
             const sale = r as SaleRecord;
