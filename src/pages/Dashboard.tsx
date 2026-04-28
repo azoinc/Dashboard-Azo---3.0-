@@ -6,6 +6,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis
 import { TrendingUp, TrendingDown, DollarSign, Target, Users, ShoppingCart, Percent, Activity } from 'lucide-react';
 import { allCommercialProjects } from '../data/commercialProjects';
 import { useInternoDashboard } from '../hooks/useInternoDashboard';
+import { useSiengeIntegration } from '../hooks/useSiengeIntegration';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16'];
 
@@ -71,6 +72,7 @@ export default function Dashboard() {
   }, [selectedMonthId, selectedProject, selectedCity, isAllMonths, yearStr, monthStr, year, month]);
 
   const { totalLeads: fetchedLeads, hottestStatusData } = useInternoDashboard(dashboardFilters);
+  const siengeData = useSiengeIntegration(dashboardFilters.startDate, dashboardFilters.endDate);
 
   if (!currentMonthData) return <div>Carregando...</div>;
 
@@ -85,8 +87,8 @@ export default function Dashboard() {
   let budgetInst = 0;
   let budgetProdutos = 0;
   let totalLeads = fetchedLeads || 0;
-  let totalVendas = 0;
-  let totalVGV = 0;
+  let totalVendas = siengeData.isConfigured ? siengeData.vendas : 0;
+  let totalVGV = siengeData.isConfigured ? siengeData.vgv : 0;
   let totalVgvProduto = 0;
   let totalEstoque = 0;
   let totalMetaVendas = 0;
@@ -101,7 +103,7 @@ export default function Dashboard() {
 
   filteredCommercialRecords.forEach(r => {
     if (projectsToInclude.includes(r.project)) {
-      if (r.type === 'venda') {
+      if (r.type === 'venda' && !siengeData.isConfigured) {
         totalVendas += r.qtde || 0;
         totalVGV += r.vgvNominal || 0;
       }
@@ -209,7 +211,7 @@ export default function Dashboard() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Dashboard</h2>
+          <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Marketing</h2>
           <p className="text-slate-500 mt-1">
             Visão geral de {MONTHS[currentMonthData.month - 1]} de {currentMonthData.year}
           </p>
@@ -235,17 +237,31 @@ export default function Dashboard() {
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">VGV do Produto</p>
           <p className="text-xl font-bold">{formatCurrency(totalVgvProduto)}</p>
         </div>
-        <div className="bg-[#61072E] rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center">
+        <div className="bg-[#61072E] rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center relative">
+          {siengeData.isConfigured && (
+            <div className="absolute top-2 right-2 flex items-center gap-1 text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full" title="Dados do Sienge">
+              <Activity size={10} /> Sienge
+            </div>
+          )}
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">VGV Realizado</p>
-          <p className="text-xl font-bold">{formatCurrency(totalVGV)}</p>
+          <p className="text-xl font-bold">
+            {siengeData.loading ? <span className="animate-pulse">...</span> : formatCurrency(totalVGV)}
+          </p>
         </div>
         <div className="bg-[#61072E] rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center">
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">Meta de Vendas</p>
           <p className="text-xl font-bold">{totalMetaVendas} unid.</p>
         </div>
-        <div className="bg-[#61072E] rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center">
+        <div className="bg-[#61072E] rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center relative">
+          {siengeData.isConfigured && (
+            <div className="absolute top-2 right-2 flex items-center gap-1 text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full" title="Dados do Sienge">
+              <Activity size={10} /> Sienge
+            </div>
+          )}
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">Vendas Realizadas</p>
-          <p className="text-xl font-bold">{totalVendas} unid.</p>
+          <p className="text-xl font-bold">
+            {siengeData.loading ? <span className="animate-pulse">...</span> : `${totalVendas} unid.`}
+          </p>
         </div>
 
         <div className="bg-slate-800 rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center">
@@ -294,24 +310,49 @@ export default function Dashboard() {
           <h3 className="text-lg font-bold text-slate-800 mb-6">Planejado x Realizado</h3>
           <div className="space-y-6">
             {projectsToInclude.map(p => {
-              const pBudget = (currentMonthData.budgets[p]?.publicidade || 0) + (currentMonthData.budgets[p]?.stand || 0) + (currentMonthData.budgets[p]?.institucional || 0) + (currentMonthData.budgets[p]?.produtos || 0);
-              const pInvestido = filteredTransactions.filter(t => t.project === p).reduce((sum, t) => sum + t.amount, 0);
-              const pPercent = pBudget > 0 ? (pInvestido / pBudget) * 100 : 0;
+              const pBudgetPub = currentMonthData.budgets[p]?.publicidade || 0;
+              const pInvestidoPub = filteredTransactions.filter(t => t.project === p && PUBLICIDADE_CATEGORIES.includes(t.category)).reduce((sum, t) => sum + t.amount, 0);
+              const pPercentPub = pBudgetPub > 0 ? (pInvestidoPub / pBudgetPub) * 100 : 0;
+
+              const pBudgetStand = currentMonthData.budgets[p]?.stand || 0;
+              const pInvestidoStand = filteredTransactions.filter(t => t.project === p && MANUTENCAO_STAND_CATEGORIES.includes(t.category)).reduce((sum, t) => sum + t.amount, 0);
+              const pPercentStand = pBudgetStand > 0 ? (pInvestidoStand / pBudgetStand) * 100 : 0;
               
-              if (pBudget === 0 && pInvestido === 0) return null;
+              if (pBudgetPub === 0 && pInvestidoPub === 0 && pBudgetStand === 0 && pInvestidoStand === 0) return null;
 
               return (
-                <div key={p}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="font-medium text-slate-700">{p}</span>
-                    <span className="text-slate-500">{formatCurrency(pInvestido)} / {formatCurrency(pBudget)}</span>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden flex">
-                    <div 
-                      className={`h-full ${pPercent > 100 ? 'bg-rose-500' : pPercent > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`} 
-                      style={{ width: `${Math.min(pPercent, 100)}%` }}
-                    ></div>
-                  </div>
+                <div key={p} className="space-y-3">
+                  <div className="font-bold text-slate-800 border-b border-slate-100 pb-1">{p}</div>
+                  
+                  {(pBudgetPub > 0 || pInvestidoPub > 0) && (
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-medium text-slate-600">Publicidade</span>
+                        <span className="text-slate-500">{formatCurrency(pInvestidoPub)} / {formatCurrency(pBudgetPub)}</span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden flex">
+                        <div 
+                          className={`h-full ${pPercentPub > 100 ? 'bg-rose-500' : pPercentPub > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`} 
+                          style={{ width: `${Math.min(pPercentPub, 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+
+                  {(pBudgetStand > 0 || pInvestidoStand > 0) && (
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-medium text-slate-600">Manut. Stand</span>
+                        <span className="text-slate-500">{formatCurrency(pInvestidoStand)} / {formatCurrency(pBudgetStand)}</span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden flex">
+                        <div 
+                          className={`h-full ${pPercentStand > 100 ? 'bg-rose-500' : pPercentStand > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`} 
+                          style={{ width: `${Math.min(pPercentStand, 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
