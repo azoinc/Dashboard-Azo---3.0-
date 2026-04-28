@@ -235,7 +235,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-[#61072E] rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center">
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">VGV do Produto</p>
-          <p className="text-xl font-bold">{formatCurrency(totalVgvProduto)}</p>
+          <p className="text-[0.8rem] font-bold">{formatCurrency(totalVgvProduto)}</p>
         </div>
         <div className="bg-[#61072E] rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center relative">
           {siengeData.isConfigured && (
@@ -244,13 +244,13 @@ export default function Dashboard() {
             </div>
           )}
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">VGV Realizado</p>
-          <p className="text-xl font-bold">
+          <p className="text-[0.8rem] font-bold">
             {siengeData.loading ? <span className="animate-pulse">...</span> : formatCurrency(totalVGV)}
           </p>
         </div>
         <div className="bg-[#61072E] rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center">
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">Meta de Vendas</p>
-          <p className="text-xl font-bold">{totalMetaVendas} unid.</p>
+          <p className="text-[0.8rem] font-bold">{totalMetaVendas} unid.</p>
         </div>
         <div className="bg-[#61072E] rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center relative">
           {siengeData.isConfigured && (
@@ -259,26 +259,26 @@ export default function Dashboard() {
             </div>
           )}
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">Vendas Realizadas</p>
-          <p className="text-xl font-bold">
+          <p className="text-[0.8rem] font-bold">
             {siengeData.loading ? <span className="animate-pulse">...</span> : `${totalVendas} unid.`}
           </p>
         </div>
 
         <div className="bg-slate-800 rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center">
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">Investimento MKT</p>
-          <p className="text-xl font-bold">{formatCurrency(totalPublicidade + totalInstitucional)}</p>
+          <p className="text-[0.8rem] font-bold">{formatCurrency(totalPublicidade + totalInstitucional)}</p>
         </div>
         <div className="bg-slate-800 rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center">
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">Investimento Stand</p>
-          <p className="text-xl font-bold">{formatCurrency(totalStand)}</p>
+          <p className="text-[0.8rem] font-bold">{formatCurrency(totalStand)}</p>
         </div>
         <div className="bg-slate-800 rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center">
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">Investimento Produto</p>
-          <p className="text-xl font-bold">{formatCurrency(totalProdutos)}</p>
+          <p className="text-[0.8rem] font-bold">{formatCurrency(totalProdutos)}</p>
         </div>
         <div className="bg-slate-800 rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center">
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">Estoque de Unid.</p>
-          <p className="text-xl font-bold">{totalEstoque} unid.</p>
+          <p className="text-[0.8rem] font-bold">{totalEstoque} unid.</p>
         </div>
       </div>
 
@@ -369,28 +369,28 @@ export default function Dashboard() {
               <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Users size={20} /></div>
               <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Leads</p>
             </div>
-            <p className="text-xl font-bold text-slate-900">{totalLeads.toLocaleString('pt-BR')}</p>
+            <p className="text-[0.8rem] font-bold text-slate-900">{totalLeads.toLocaleString('pt-BR')}</p>
           </div>
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><Activity size={20} /></div>
               <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Visitas On</p>
             </div>
-            <p className="text-xl font-bold text-slate-900">{totalVisitasOn}</p>
+            <p className="text-[0.8rem] font-bold text-slate-900">{totalVisitasOn}</p>
           </div>
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Activity size={20} /></div>
               <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Visitas Off</p>
             </div>
-            <p className="text-xl font-bold text-slate-900">{totalVisitasOff}</p>
+            <p className="text-[0.8rem] font-bold text-slate-900">{totalVisitasOff}</p>
           </div>
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><Percent size={20} /></div>
               <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Conversão</p>
             </div>
-            <p className="text-xl font-bold text-slate-900">{taxaConversao.toFixed(1)}%</p>
+            <p className="text-[0.8rem] font-bold text-slate-900">{taxaConversao.toFixed(1)}%</p>
           </div>
         </div>
 
