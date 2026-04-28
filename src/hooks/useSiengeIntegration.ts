@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { siengeService } from '../services/siengeIntegrationApi';
+import { siengeService } from '../services/siengeService';
 
 export function useSiengeIntegration(startDate: string, endDate: string) {
   const [siengeData, setSiengeData] = useState({
