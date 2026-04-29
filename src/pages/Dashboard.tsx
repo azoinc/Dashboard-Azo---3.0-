@@ -35,7 +35,7 @@ const PROJECT_COLORS: Record<string, string> = {
 };
 
 export default function Dashboard() {
-  const { data, currentMonthData, selectedCity, selectedProject, filteredTransactions, transactions, timelineEvents, selectedMonthId, filteredCommercialRecords } = useExpense();
+  const { data, currentMonthData, selectedCity, selectedProject, filteredTransactions, transactions, timelineEvents, selectedMonthId, filteredCommercialRecords, salesGoals, selectedYear } = useExpense();
 
   const isAllMonths = selectedMonthId.endsWith('-ALL');
   const [yearStr, monthStr] = selectedMonthId.split('-');
@@ -119,12 +119,33 @@ export default function Dashboard() {
       budgetProdutos += b.produtos || 0;
     }
     
-    const commProj = getCommercialProject(p);
-    if (commProj) {
-      totalVgvProduto += commProj.target.vgv;
-      totalEstoque += commProj.target.unid;
-      totalMetaVendas += commProj.total.unid;
+    let commProjTargetVgv = 0;
+    let commProjTargetUnid = 0;
+    let commProjTotalUnid = 0;
+
+    const yearGoal = salesGoals.find((g) => g.year === selectedYear);
+    if (yearGoal) {
+      const match = yearGoal.projects.find((pg) => {
+        const pn = p.toLowerCase();
+        const gn = pg.name.toLowerCase();
+        return pn.includes(gn) || gn.includes(pn) || 
+               (p === 'A Noite' && pg.name === 'Noite') ||
+               (p === 'Ipanema' && pg.name === 'Ar Ipanema') ||
+               (p === 'Gávea' && pg.name === 'Gávea 99') ||
+               (p === 'Ares' && pg.name === 'Ares Home') ||
+               (p === 'Verter' && pg.name === 'Verter Cambuí') ||
+               (p === 'Natus' && pg.name === 'Natus Home');
+      });
+      if (match) {
+        commProjTargetVgv = match.target?.vgv || 0;
+        commProjTargetUnid = match.target?.unid || 0;
+        commProjTotalUnid = (match.q1?.unid || 0) + (match.q2?.unid || 0) + (match.q3?.unid || 0) + (match.q4?.unid || 0);
+      }
     }
+
+    totalVgvProduto += commProjTargetVgv;
+    totalEstoque += commProjTargetUnid;
+    totalMetaVendas += commProjTotalUnid;
 
     const comm = currentMonthData.commercial[p];
     if (comm) {
