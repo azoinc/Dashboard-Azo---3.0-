@@ -429,7 +429,7 @@ export default function CommercialEntry() {
         <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
           <h3 className="text-lg font-bold text-slate-800">Lançamentos Comerciais</h3>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[500px]">
           <table className="w-full text-left text-sm">
             <thead className="bg-white">
               <tr className="text-slate-500 uppercase tracking-wider text-xs border-b border-slate-200">
@@ -481,7 +481,7 @@ export default function CommercialEntry() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <td className="px-6 py-4 whitespace-nowrap text-right align-top">
                       <button
                         onClick={() => deleteCommercialRecord(record.id)}
                         className="text-rose-500 hover:text-rose-700 p-2 hover:bg-rose-50 rounded-lg transition-colors"
@@ -498,24 +498,49 @@ export default function CommercialEntry() {
         </div>
         
         {totalPages > 1 && (
-          <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+          <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
             <span className="text-sm text-slate-500">
               Página {currentPage} de {totalPages}
             </span>
-            <div className="flex space-x-2">
+            <div className="flex items-center space-x-1">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="p-1 rounded-lg border border-slate-300 bg-white text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
+                className="p-1.5 rounded-lg border border-slate-300 bg-white text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
-                <ChevronLeft size={20} />
+                <ChevronLeft size={18} />
               </button>
+              
+              {(() => {
+                let start = Math.max(1, currentPage - 1);
+                let end = Math.min(totalPages, start + 2);
+                if (end - start < 2) {
+                  start = Math.max(1, end - 2);
+                }
+                const pages = [];
+                for (let i = start; i <= end; i++) pages.push(i);
+                
+                return pages.map(pageNum => (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
+                      currentPage === pageNum 
+                        ? 'bg-indigo-600 text-white border border-transparent' 
+                        : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                ));
+              })()}
+
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="p-1 rounded-lg border border-slate-300 bg-white text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
+                className="p-1.5 rounded-lg border border-slate-300 bg-white text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
-                <ChevronRight size={20} />
+                <ChevronRight size={18} />
               </button>
             </div>
           </div>
