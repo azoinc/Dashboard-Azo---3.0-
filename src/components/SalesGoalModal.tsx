@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Target, Save, ChevronRight, ChevronLeft, Building2 } from 'lucide-react';
 import { Project, ALL_PROJECTS, SalesGoal } from '../types';
 import { formatCurrency } from '../utils';
@@ -35,6 +35,17 @@ export function SalesGoalModal({ isOpen, onClose, salesGoals, setSalesGoals, cur
     q3: { unid: 0, vgv: 0 },
     q4: { unid: 0, vgv: 0 },
   })));
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
 
   // If year changes, reset data or load existing
   const handleYearChange = (newYear: string) => {
@@ -185,7 +196,7 @@ export function SalesGoalModal({ isOpen, onClose, salesGoals, setSalesGoals, cur
           {activeProjects.length > 0 && (
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
               <h4 className="text-md font-bold text-slate-800 mb-4">Meta Total do Ano por Projeto</h4>
-              <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
+              <div className="space-y-4">
                 {projectsData.map(proj => (
                   <div key={proj.name} className="flex flex-col md:flex-row gap-4 items-center bg-slate-50 p-4 rounded-xl border border-slate-100">
                     <div className="w-full md:w-1/3 font-bold text-slate-700 flex items-center gap-2">
@@ -196,6 +207,7 @@ export function SalesGoalModal({ isOpen, onClose, salesGoals, setSalesGoals, cur
                       <label className="text-xs text-slate-500 mb-1 block">Meta Unidades</label>
                       <input 
                         type="number"
+                        onWheel={(e) => e.currentTarget.blur()}
                         value={proj.target.unid || ''}
                         onChange={(e) => handleDataChange(proj.name, 'target', 'unid', Number(e.target.value))}
                         className="w-full px-4 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-rose-500 outline-none"
@@ -206,6 +218,7 @@ export function SalesGoalModal({ isOpen, onClose, salesGoals, setSalesGoals, cur
                       <label className="text-xs text-slate-500 mb-1 block">Meta VGV (VP) R$</label>
                       <input 
                         type="number"
+                        onWheel={(e) => e.currentTarget.blur()}
                         value={proj.target.vgv || ''}
                         onChange={(e) => handleDataChange(proj.name, 'target', 'vgv', Number(e.target.value))}
                         className="w-full px-4 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-rose-500 outline-none"
@@ -231,7 +244,7 @@ export function SalesGoalModal({ isOpen, onClose, salesGoals, setSalesGoals, cur
             <Target className="text-rose-500" />
             Metas {quarterName} ({year})
           </h3>
-          <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
+          <div className="space-y-4">
             {projectsData.map(proj => {
               const qData = proj[quarterField];
               return (
@@ -244,6 +257,7 @@ export function SalesGoalModal({ isOpen, onClose, salesGoals, setSalesGoals, cur
                     <label className="text-xs text-slate-500 mb-1 block">Meta Unidades</label>
                     <input 
                       type="number"
+                      onWheel={(e) => e.currentTarget.blur()}
                       value={qData.unid || ''}
                       onChange={(e) => handleDataChange(proj.name, quarterField, 'unid', Number(e.target.value))}
                       className="w-full px-4 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-rose-500 outline-none"
@@ -254,6 +268,7 @@ export function SalesGoalModal({ isOpen, onClose, salesGoals, setSalesGoals, cur
                     <label className="text-xs text-slate-500 mb-1 block">Meta VGV (VP) R$</label>
                     <input 
                       type="number"
+                      onWheel={(e) => e.currentTarget.blur()}
                       value={qData.vgv || ''}
                       onChange={(e) => handleDataChange(proj.name, quarterField, 'vgv', Number(e.target.value))}
                       className="w-full px-4 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-rose-500 outline-none"
@@ -270,8 +285,8 @@ export function SalesGoalModal({ isOpen, onClose, salesGoals, setSalesGoals, cur
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex justify-center items-center z-50 p-4 sm:p-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-full flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex justify-center items-center z-50 p-4 sm:p-6 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[100dvh] sm:max-h-[90vh] flex flex-col overflow-hidden">
         
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-slate-100 shrink-0">
