@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Target, Save, ChevronRight, ChevronLeft, Building2 } from 'lucide-react';
 import { Project, ALL_PROJECTS, SalesGoal } from '../types';
 import { formatCurrency } from '../utils';
@@ -284,7 +285,7 @@ export function SalesGoalModal({ isOpen, onClose, salesGoals, setSalesGoals, cur
     );
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex justify-center items-center z-50 p-4 sm:p-6 overflow-hidden">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[100dvh] sm:max-h-[90vh] flex flex-col overflow-hidden">
         
@@ -352,6 +353,7 @@ export function SalesGoalModal({ isOpen, onClose, salesGoals, setSalesGoals, cur
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
