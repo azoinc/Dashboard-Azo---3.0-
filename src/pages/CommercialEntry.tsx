@@ -429,7 +429,7 @@ export default function CommercialEntry() {
         <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
           <h3 className="text-lg font-bold text-slate-800">Lançamentos Comerciais</h3>
         </div>
-        <div className="overflow-x-auto min-h-[500px]">
+        <div className="overflow-auto h-[400px]">
           <table className="w-full text-left text-sm">
             <thead className="bg-white">
               <tr className="text-slate-500 uppercase tracking-wider text-xs border-b border-slate-200">
