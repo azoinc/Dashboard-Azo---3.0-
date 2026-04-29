@@ -6,10 +6,12 @@
 import React, { useState } from 'react';
 import { ExpenseProvider } from './context/ExpenseContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { Layout } from './components/Layout';
+import { Layout, TabType } from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import DataEntry from './pages/DataEntry';
 import CommercialEntry from './pages/CommercialEntry';
+import CommercialPipeline from './pages/CommercialPipeline';
+import CommercialVisits from './pages/CommercialVisits';
 import AdminPanel from './pages/AdminPanel';
 import Login from './pages/Login';
 import InstitucionalEntry from './pages/InstitucionalEntry';
@@ -21,7 +23,7 @@ import { CommercialModal } from './components/CommercialModal';
 
 const AppContent = () => {
   const { user, loading, userRole } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'entry' | 'commercial' | 'institucional' | 'timeline' | 'admin'>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [selectedDashboard, setSelectedDashboard] = useState<'comercial' | 'interno' | 'gdash' | null>(null);
 
   if (loading) {
@@ -52,12 +54,14 @@ const AppContent = () => {
       >
         {activeTab === 'dashboard' && <Dashboard />}
         {activeTab === 'entry' && <DataEntry />}
-        {activeTab === 'commercial' && <CommercialEntry />}
+        {activeTab === 'commercial_sales' && <CommercialEntry />}
+        {activeTab === 'commercial_pipeline' && <CommercialPipeline />}
+        {activeTab === 'commercial_visits' && <CommercialVisits />}
         {activeTab === 'institucional' && <InstitucionalEntry />}
         {activeTab === 'timeline' && <Timeline />}
         {activeTab === 'admin' && userRole === 'MASTER' && <AdminPanel />}
       </Layout>
-      <TransactionModal activeTab={activeTab} />
+      <TransactionModal activeTab={activeTab as any} />
       <CommercialModal />
     </ExpenseProvider>
   );
