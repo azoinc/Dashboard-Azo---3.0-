@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { MonthData, ExpenseCategory, PUBLICIDADE_CATEGORIES, MANUTENCAO_STAND_CATEGORIES, Transaction, TransactionLog, City, Project, UserRole, PROJECTS_BY_CITY, ALL_PROJECTS, ProjectBudget, CommercialMetrics, CommercialRecord, TimelineEvent, SaleRecord } from '../types';
+import { MonthData, ExpenseCategory, PUBLICIDADE_CATEGORIES, MANUTENCAO_STAND_CATEGORIES, Transaction, TransactionLog, City, Project, UserRole, PROJECTS_BY_CITY, ALL_PROJECTS, ProjectBudget, CommercialMetrics, CommercialRecord, TimelineEvent, SaleRecord, SalesGoal } from '../types';
 import { useAuth } from './AuthContext';
 import { db } from '../services/firebase';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
@@ -39,6 +39,10 @@ interface ExpenseContextType {
   addTimelineEvent: (event: Omit<TimelineEvent, 'id'>) => void;
   deleteTimelineEvent: (id: string) => void;
   syncSupabaseData: () => Promise<void>;
+  salesGoals: SalesGoal[];
+  setSalesGoals: React.Dispatch<React.SetStateAction<SalesGoal[]>>;
+  selectedYear: string;
+  isAllMonths: boolean;
 }
 
 const ExpenseContext = createContext<ExpenseContextType | undefined>(undefined);
@@ -75,6 +79,7 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [selectedProject, setSelectedProject] = useState<Project | 'ALL'>('ALL');
 
   const [commercialRecords, setCommercialRecords] = useState<CommercialRecord[]>([]);
+  const [salesGoals, setSalesGoals] = useState<SalesGoal[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
   const [logs, setLogs] = useState<TransactionLog[]>([]);
@@ -109,6 +114,12 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     });
 
+    const unsubscribeSalesGoals = onSnapshot(doc(db, 'appData', 'salesGoals'), (doc) => {
+      if (doc.exists()) {
+        setSalesGoals(doc.data().items || []);
+      }
+    });
+
     const unsubscribeTimeline = onSnapshot(doc(db, 'appData', 'timelineEvents'), (doc) => {
       if (doc.exists()) {
         setTimelineEvents(doc.data().items || []);
@@ -126,6 +137,7 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
       unsubscribeData();
       unsubscribeTransactions();
       unsubscribeCommercial();
+      unsubscribeSalesGoals();
       unsubscribeTimeline();
       unsubscribeLogs();
     };
@@ -159,6 +171,11 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!isLoaded || !user) return;
     setDoc(doc(db, 'appData', 'commercialRecords'), { items: commercialRecords });
   }, [commercialRecords, isLoaded, user]);
+
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+    setDoc(doc(db, 'appData', 'salesGoals'), { items: salesGoals });
+  }, [salesGoals, isLoaded, user]);
 
   useEffect(() => {
     if (!isLoaded || !user) return;
@@ -609,7 +626,8 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
       transactions, filteredTransactions, logs, addTransaction, addTransactions, updateTransactionAmount, isModalOpen, setIsModalOpen,
       commercialRecords, filteredCommercialRecords, addCommercialRecord, addCommercialRecords, deleteCommercialRecord, isCommercialModalOpen, setIsCommercialModalOpen,
       userRole, selectedCity, setSelectedCity, selectedProject, setSelectedProject,
-      timelineEvents, addTimelineEvent, deleteTimelineEvent, syncSupabaseData
+      timelineEvents, addTimelineEvent, deleteTimelineEvent, syncSupabaseData,
+      salesGoals, setSalesGoals, selectedYear, isAllMonths
     }}>
       {children}
     </ExpenseContext.Provider>
