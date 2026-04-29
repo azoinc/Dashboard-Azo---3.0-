@@ -1,24 +1,36 @@
-import React, { useState } from 'react';
-import { LayoutDashboard, Receipt, Menu, X, Building2, MapPin, UserCircle, TrendingUp, LogOut, ShieldAlert, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { LayoutDashboard, Receipt, Menu, X, Building2, MapPin, UserCircle, TrendingUp, LogOut, ShieldAlert, ArrowLeft, ChevronDown, ChevronRight, Target, HardHat, Footprints } from 'lucide-react';
 import { useExpense } from '../context/ExpenseContext';
 import { useAuth } from '../context/AuthContext';
 import { MONTHS } from '../utils';
 import { City, Project, PROJECTS_BY_CITY } from '../types';
 
+export type TabType = 'dashboard' | 'entry' | 'commercial_sales' | 'commercial_pipeline' | 'commercial_visits' | 'institucional' | 'timeline' | 'admin';
+
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'entry' | 'commercial' | 'institucional' | 'timeline' | 'admin';
-  setActiveTab: (tab: 'dashboard' | 'entry' | 'commercial' | 'institucional' | 'timeline' | 'admin') => void;
+  activeTab: TabType;
+  setActiveTab: (tab: TabType) => void;
   onBackToSelection?: () => void;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onBackToSelection }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const isCommercialActive = activeTab.startsWith('commercial');
+  const [isCommercialMenuOpen, setIsCommercialMenuOpen] = useState(isCommercialActive);
+  
   const { 
     data, selectedMonthId, setSelectedMonthId, currentMonthData,
     selectedCity, setSelectedCity, selectedProject, setSelectedProject
   } = useExpense();
   const { userRole, user, signOut } = useAuth();
+
+  useEffect(() => {
+    if (isCommercialActive) {
+      setIsCommercialMenuOpen(true);
+    }
+  }, [isCommercialActive]);
+
 
   const availableProjects = selectedCity === 'ALL' 
     ? [...PROJECTS_BY_CITY['Rio de Janeiro'], ...PROJECTS_BY_CITY['Campinas']]
@@ -40,7 +52,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               </button>
             )}
             <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center font-bold text-[#61072E]">A</div>
-            <h1 className="text-xl font-bold tracking-tight text-white">Dashboard - Marketing Azo</h1>
+            <h1 className="text-xl font-bold tracking-tight text-white">Marketing Azo</h1>
           </div>
           <button className="md:hidden p-2 text-white/70 hover:text-white" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
             {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -71,7 +83,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeTab === 'dashboard' ? 'bg-emerald-500 text-[#61072E] shadow-md shadow-emerald-500/20' : 'hover:bg-[#4a0523] text-white/70 hover:text-white'}`}
             >
               <LayoutDashboard size={20} />
-              <span className="font-medium">Dashboard</span>
+              <span className="font-medium">Marketing</span>
             </button>
             {userRole !== 'DIRETORIA' && (
               <>
@@ -82,13 +94,44 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
                   <Receipt size={20} />
                   <span className="font-medium">Lançamentos</span>
                 </button>
-                <button
-                  onClick={() => { setActiveTab('commercial'); setIsMobileMenuOpen(false); }}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeTab === 'commercial' ? 'bg-emerald-500 text-[#61072E] shadow-md shadow-emerald-500/20' : 'hover:bg-[#4a0523] text-white/70 hover:text-white'}`}
-                >
-                  <TrendingUp size={20} />
-                  <span className="font-medium">Comercial</span>
-                </button>
+                <div className="flex flex-col space-y-1">
+                  <button
+                    onClick={() => { setIsCommercialMenuOpen(!isCommercialMenuOpen); }}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 ${isCommercialActive ? 'bg-[#4a0523]/80 text-[#emerald-400]' : 'hover:bg-[#4a0523] text-white/70 hover:text-white'}`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <TrendingUp size={20} className={isCommercialActive ? 'text-emerald-400' : ''} />
+                      <span className={`font-medium ${isCommercialActive ? 'text-white' : ''}`}>Comercial</span>
+                    </div>
+                    {isCommercialMenuOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </button>
+                  
+                  {isCommercialMenuOpen && (
+                    <div className="pl-4 pr-2 py-1 space-y-1 animate-in slide-in-from-top-2 duration-200">
+                      <button
+                        onClick={() => { setActiveTab('commercial_sales'); setIsMobileMenuOpen(false); }}
+                        className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${activeTab === 'commercial_sales' ? 'bg-emerald-500 text-[#61072E] shadow-md shadow-emerald-500/20' : 'hover:bg-[#4a0523] text-white/70 hover:text-emerald-400'}`}
+                      >
+                        <Target size={18} />
+                        <span className="font-medium text-sm">Metas e vendas</span>
+                      </button>
+                      <button
+                        onClick={() => { setActiveTab('commercial_pipeline'); setIsMobileMenuOpen(false); }}
+                        className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${activeTab === 'commercial_pipeline' ? 'bg-emerald-500 text-[#61072E] shadow-md shadow-emerald-500/20' : 'hover:bg-[#4a0523] text-white/70 hover:text-emerald-400'}`}
+                      >
+                        <HardHat size={18} />
+                        <span className="font-medium text-sm">Pipeline</span>
+                      </button>
+                      <button
+                        onClick={() => { setActiveTab('commercial_visits'); setIsMobileMenuOpen(false); }}
+                        className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${activeTab === 'commercial_visits' ? 'bg-emerald-500 text-[#61072E] shadow-md shadow-emerald-500/20' : 'hover:bg-[#4a0523] text-white/70 hover:text-emerald-400'}`}
+                      >
+                        <Footprints size={18} />
+                        <span className="font-medium text-sm">Visitas</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => { setActiveTab('institucional'); setIsMobileMenuOpen(false); }}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${activeTab === 'institucional' ? 'bg-emerald-500 text-[#61072E] shadow-md shadow-emerald-500/20' : 'hover:bg-[#4a0523] text-white/70 hover:text-white'}`}
