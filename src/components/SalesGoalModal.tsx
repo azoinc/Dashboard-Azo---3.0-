@@ -14,7 +14,8 @@ interface Props {
 export function SalesGoalModal({ isOpen, onClose, salesGoals, setSalesGoals, currentYear }: Props) {
   const [step, setStep] = useState(1);
   const [year, setYear] = useState(currentYear);
-  const [activeProjects, setActiveProjects] = useState<Project[]>(ALL_PROJECTS);
+  const [activeProjects, setActiveProjects] = useState<string[]>(ALL_PROJECTS);
+  const [newProject, setNewProject] = useState('');
   
   // Try to find existing goal for this year
   const existingGoal = salesGoals.find(g => g.year === year);
@@ -41,7 +42,7 @@ export function SalesGoalModal({ isOpen, onClose, salesGoals, setSalesGoals, cur
     const found = salesGoals.find(g => g.year === newYear);
     if (found) {
       setProjectsData(found.projects);
-      setActiveProjects(found.projects.map(p => p.name as Project));
+      setActiveProjects(found.projects.map(p => p.name));
     } else {
       setProjectsData(activeProjects.map(p => ({
         name: p,
@@ -54,7 +55,7 @@ export function SalesGoalModal({ isOpen, onClose, salesGoals, setSalesGoals, cur
     }
   };
 
-  const handleProjectToggle = (project: Project) => {
+  const handleProjectToggle = (project: string) => {
     if (activeProjects.includes(project)) {
       setActiveProjects(prev => prev.filter(p => p !== project));
       setProjectsData(prev => prev.filter(p => p.name !== project));
@@ -137,7 +138,7 @@ export function SalesGoalModal({ isOpen, onClose, salesGoals, setSalesGoals, cur
             <div className="mb-4">
               <label className="block text-sm font-medium text-slate-700 mb-3">Selecione os projetos ativos para este ano</label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {ALL_PROJECTS.map(proj => (
+                {Array.from(new Set([...ALL_PROJECTS, ...activeProjects])).map(proj => (
                   <label key={proj} className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-colors ${activeProjects.includes(proj) ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
                     <input 
                       type="checkbox" 
@@ -148,6 +149,35 @@ export function SalesGoalModal({ isOpen, onClose, salesGoals, setSalesGoals, cur
                     <span className="text-sm font-medium">{proj}</span>
                   </label>
                 ))}
+              </div>
+              <div className="mt-4 flex max-w-sm">
+                <input 
+                  type="text"
+                  value={newProject}
+                  onChange={e => setNewProject(e.target.value)}
+                  placeholder="Novo Projeto"
+                  className="flex-1 px-4 py-2 text-sm rounded-l-xl border border-slate-300 focus:ring-2 focus:ring-rose-500 outline-none"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && newProject.trim()) {
+                      e.preventDefault();
+                      if (!activeProjects.includes(newProject.trim())) {
+                        handleProjectToggle(newProject.trim());
+                      }
+                      setNewProject('');
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    if (newProject.trim() && !activeProjects.includes(newProject.trim())) {
+                      handleProjectToggle(newProject.trim());
+                      setNewProject('');
+                    }
+                  }}
+                  className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white text-sm font-medium rounded-r-xl transition-colors"
+                >
+                  Adicionar
+                </button>
               </div>
             </div>
           </div>
