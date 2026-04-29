@@ -438,7 +438,7 @@ export const AnnualOverview = () => {
           <div>
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <Target className="text-indigo-500" size={20} />
-              Meta Equipe de Vendas - Projetos Ativos
+              Meta de Vendas - Projetos Ativos
             </h3>
             <p className="text-sm text-slate-500 mt-1">
               Visão anual distribuída por trimestres e praças
@@ -470,7 +470,7 @@ export const AnnualOverview = () => {
                   colSpan={2}
                   className="px-4 py-2 text-center border-r border-slate-200 border-b bg-slate-100/50"
                 >
-                  Meta Geral
+                  Total por Projeto
                 </th>
                 <th
                   colSpan={4}
