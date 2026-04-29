@@ -169,3 +169,16 @@ export interface TimelineEvent {
   imageUrl?: string;
 }
 
+export interface SalesGoal {
+  id: string; // usually year, e.g. "2024"
+  year: string;
+  projects: {
+    name: string;
+    target: { unid: number; vgv: number };
+    q1: { unid: number; vgv: number };
+    q2: { unid: number; vgv: number };
+    q3: { unid: number; vgv: number };
+    q4: { unid: number; vgv: number };
+  }[];
+}
+
