@@ -179,7 +179,7 @@ export const AnnualOverview = () => {
           q3: { ...baseProject.q3, ...result.q3 },
           q4: { ...baseProject.q4, ...result.q4 },
           totalRealized: result.totalRealized,
-          vso: baseProject.target?.unid > 0 ? Math.round((result.totalRealized.vendas / baseProject.target.unid) * 100) : 0
+          vso: totalMetaUnid > 0 ? Math.round((result.totalRealized.vendas / totalMetaUnid) * 100) : 0
         };
       };
 
@@ -200,22 +200,22 @@ export const AnnualOverview = () => {
       const tSP = calculateTotal(spCombined);
       tSP.name = "São Paulo";
       tSP.vso =
-        tSP.target.unid > 0
-          ? Math.round((tSP.totalRealized.vendas / tSP.target.unid) * 100)
+        tSP.total.unid > 0
+          ? Math.round((tSP.totalRealized.vendas / tSP.total.unid) * 100)
           : 0;
 
       const tRJ = calculateTotal(rjCombined);
       tRJ.name = "Rio de Janeiro";
       tRJ.vso =
-        tRJ.target.unid > 0
-          ? Math.round((tRJ.totalRealized.vendas / tRJ.target.unid) * 100)
+        tRJ.total.unid > 0
+          ? Math.round((tRJ.totalRealized.vendas / tRJ.total.unid) * 100)
           : 0;
 
       const tGeral = calculateTotal([tSP, tRJ]);
       tGeral.name = "Total Geral";
       tGeral.vso =
-        tGeral.target.unid > 0
-          ? Math.round((tGeral.totalRealized.vendas / tGeral.target.unid) * 100)
+        tGeral.total.unid > 0
+          ? Math.round((tGeral.totalRealized.vendas / tGeral.total.unid) * 100)
           : 0;
 
       return {
