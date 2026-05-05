@@ -298,11 +298,25 @@ export default function CommercialEntry() {
     ? (currentMonthData.commercial[selectedProject] || { leads: 0, vendas: 0, vgv: 0, visitasOn: 0, visitasOff: 0 })
     : null;
 
-  const totalPages = Math.ceil(filteredCommercialRecords.length / ITEMS_PER_PAGE);
+  const sortedRecords = useMemo(() => {
+    return [...filteredCommercialRecords].sort((a, b) => {
+      const parseDate = (d: string) => {
+        if (!d) return 0;
+        if (d.includes('/')) {
+          const [day, month, year] = d.split('/');
+          return new Date(`${year}-${month}-${day}T12:00:00Z`).getTime();
+        }
+        return new Date(`${d}T12:00:00Z`).getTime();
+      };
+      return parseDate(b.date) - parseDate(a.date);
+    });
+  }, [filteredCommercialRecords]);
+
+  const totalPages = Math.ceil(sortedRecords.length / ITEMS_PER_PAGE);
   const paginatedRecords = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredCommercialRecords.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredCommercialRecords, currentPage]);
+    return sortedRecords.slice(start, start + ITEMS_PER_PAGE);
+  }, [sortedRecords, currentPage]);
 
   // Reset to first page if filters change
   React.useEffect(() => {
