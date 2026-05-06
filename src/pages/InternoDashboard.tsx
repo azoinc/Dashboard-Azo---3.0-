@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { LogOut, ArrowLeft, BarChart3, Users, Megaphone, Filter } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  LineChart, Line, FunnelChart, Funnel, LabelList, Cell
+  LineChart, Line, FunnelChart, Funnel, LabelList, Cell, PieChart, Pie
 } from 'recharts';
 import { useInternoDashboard } from '../hooks/useInternoDashboard';
 import { DateRangePicker, DateRange } from '../components/DateRangePicker';
@@ -226,6 +226,10 @@ export default function InternoDashboard({ onBack }: Props) {
   const displayTotalLeads = totalLeads.toLocaleString('pt-BR');
   const displayVisitaCount = hottestStatusData.visita;
   const displayAgendamentoCount = hottestStatusData.agendamento;
+  const displayPropostaCount = hottestStatusData.proposta;
+  const displayVendaCount = hottestStatusData.venda;
+
+  const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#eab308', '#ec4899', '#f43f5e', '#84cc16'];
 
   return (
     <div className="min-h-screen bg-[#1a1c23] flex flex-col animate-in fade-in duration-500 font-sans text-slate-200">
@@ -329,67 +333,104 @@ export default function InternoDashboard({ onBack }: Props) {
       <main className="flex-1 p-6 overflow-y-auto">
         {activeTab === 'gerais' && (
           <div className="space-y-6 max-w-7xl mx-auto">
-            {/* Top Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              <div className="flex flex-col space-y-4">
-                <div className="bg-[#242731] p-6 rounded-xl border border-slate-800 text-center flex flex-col justify-center items-center">
-                  <p className="text-slate-400 text-sm font-medium mb-1 uppercase">Leads Totais</p>
-                  <p className="text-4xl font-bold text-white">{displayTotalLeads}</p>
-                </div>
-                
-                <div className="text-center mt-4 mb-2">
-                  <p className="text-slate-400 text-sm font-medium uppercase">Status Mais Quente</p>
-                </div>
-
-                <div className="bg-[#242731] p-6 rounded-xl border border-slate-800 text-center flex flex-col justify-center items-center">
-                  <p className="text-slate-400 text-sm font-medium mb-1">Agendamento</p>
-                  <p className="text-4xl font-bold text-white">{displayAgendamentoCount}</p>
-                </div>
-
-                <div className="bg-[#242731] p-6 rounded-xl border border-slate-800 text-center flex flex-col justify-center items-center">
-                  <p className="text-slate-400 text-sm font-medium mb-1">Visitas</p>
-                  <p className="text-4xl font-bold text-white">{displayVisitaCount}</p>
-                </div>
+            {/* Top Row: Big Numbers */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800 text-center flex flex-col justify-center items-center">
+                <p className="text-slate-400 text-xs font-medium mb-1 uppercase">Leads Totais</p>
+                <p className="text-3xl font-bold text-white">{displayTotalLeads}</p>
               </div>
-              
-              <div className="lg:col-span-3 bg-[#242731] p-6 rounded-xl border border-slate-800">
-                <h3 className="text-sm font-medium text-slate-400 mb-4">Status</h3>
-                <div className="h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={displayStatusData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} angle={-45} textAnchor="end" height={80} />
-                      <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800 text-center flex flex-col justify-center items-center">
+                <p className="text-slate-400 text-xs font-medium mb-1 uppercase">Agendamentos</p>
+                <p className="text-3xl font-bold text-white">{displayAgendamentoCount}</p>
+              </div>
+              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800 text-center flex flex-col justify-center items-center">
+                <p className="text-slate-400 text-xs font-medium mb-1 uppercase">Visitas</p>
+                <p className="text-3xl font-bold text-white">{displayVisitaCount}</p>
+              </div>
+              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800 text-center flex flex-col justify-center items-center">
+                <p className="text-slate-400 text-xs font-medium mb-1 uppercase">Propostas</p>
+                <p className="text-3xl font-bold text-white">{displayPropostaCount}</p>
+              </div>
+              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800 text-center flex flex-col justify-center items-center">
+                <p className="text-slate-400 text-xs font-medium mb-1 uppercase">Vendas Realizadas</p>
+                <p className="text-3xl font-bold text-white">{displayVendaCount}</p>
               </div>
             </div>
 
-            {/* Funnel Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Row 2: Evolução de Status */}
+            <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
+              <h3 className="text-sm font-medium text-slate-400 mb-4">Evolução de Status no Mês</h3>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={displayStackedStatusData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <XAxis dataKey="status" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} angle={-45} textAnchor="end" height={80} />
+                    <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: '12px', color: '#94a3b8' }} verticalAlign="top" height={36} />
+                    {displayAvailableMonths.map((month, idx) => (
+                      <Bar key={month} dataKey={month} stackId="a" fill={COLORS[idx % COLORS.length]} />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Row 3: Funnel & Pie Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
                 <h3 className="text-sm font-medium text-slate-400 mb-4">Funil Status Atual</h3>
-                <div className="h-80">
+                <div className="h-64">
                   <CustomFunnel data={displayFunnelData} total={totalLeads || 1551} />
                 </div>
               </div>
+
               <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
-                <h3 className="text-sm font-medium text-slate-400 mb-4">Evolução de Status</h3>
-                <div className="h-80">
+                <h3 className="text-sm font-medium text-slate-400 mb-4">Motivo Cancelamento</h3>
+                <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={displayStackedStatusData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                      <XAxis dataKey="status" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} angle={-45} textAnchor="end" height={80} />
-                      <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                    <PieChart>
+                      <Pie
+                        data={displayCancelReasons}
+                        dataKey="count"
+                        nameKey="reason"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        innerRadius={40}
+                        fill="#8884d8"
+                      >
+                        {displayCancelReasons.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
                       <Tooltip content={<CustomTooltip />} />
-                      <Legend wrapperStyle={{ fontSize: '12px', color: '#94a3b8' }} verticalAlign="top" height={36} />
-                      {displayAvailableMonths.map((month, idx) => (
-                        <Bar key={month} dataKey={month} stackId="a" fill={['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899'][idx % 5]} />
-                      ))}
-                    </BarChart>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
+                <h3 className="text-sm font-medium text-slate-400 mb-4">Origem</h3>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={displayOriginData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        innerRadius={40}
+                        fill="#8884d8"
+                      >
+                        {displayOriginData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
                   </ResponsiveContainer>
                 </div>
               </div>
@@ -418,46 +459,6 @@ export default function InternoDashboard({ onBack }: Props) {
                       ))}
                     </LineChart>
                 </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Bottom Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
-                <h3 className="text-sm font-medium text-slate-400 mb-4">Origem</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={displayOriginData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                      <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                      <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} width={80} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              
-              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800 overflow-hidden flex flex-col">
-                <h3 className="text-sm font-medium text-slate-400 mb-4">Motivo Cancelamento</h3>
-                <div className="flex-1 overflow-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="text-xs text-slate-400 uppercase bg-[#1a1c23]">
-                      <tr>
-                        <th className="px-4 py-3 rounded-tl-lg">Motivo</th>
-                        <th className="px-4 py-3 rounded-tr-lg text-right">Record Count</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayCancelReasons.map((item, idx) => (
-                        <tr key={idx} className="border-b border-slate-800/50 hover:bg-[#1a1c23]/50">
-                          <td className="px-4 py-3 font-medium">{item.reason}</td>
-                          <td className="px-4 py-3 text-right text-blue-400">{item.count}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
               </div>
             </div>
 
