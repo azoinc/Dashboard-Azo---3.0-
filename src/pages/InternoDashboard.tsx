@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 import { useInternoDashboard } from '../hooks/useInternoDashboard';
 import { DateRangePicker, DateRange } from '../components/DateRangePicker';
+import { PROJECTS_BY_CITY, ALL_PROJECTS } from '../types';
 
 interface Props {
   onBack: () => void;
@@ -197,7 +198,7 @@ export default function InternoDashboard({ onBack }: Props) {
   const { signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<'gerais' | 'corretores' | 'ads'>('gerais');
   const [filters, setFilters] = useState({ 
-    period: 'Todo o período', 
+    period: 'Este mês', 
     project: 'Todos', 
     broker: 'Todos',
     competence: 'Atual',
@@ -305,11 +306,9 @@ export default function InternoDashboard({ onBack }: Props) {
             onChange={(e) => setFilters({ ...filters, project: e.target.value })}
           >
             <option value="Todos">Todos os Empreendimentos</option>
-            <option value="Ipanema">Ipanema</option>
-            <option value="Casa da Mata">Casa da Mata</option>
-            <option value="Insigna">Insigna</option>
-            <option value="Verter">Verter</option>
-            <option value="Ares">Ares</option>
+            {ALL_PROJECTS.map(proj => (
+              <option key={proj} value={proj}>{proj}</option>
+            ))}
           </select>
         </div>
         
