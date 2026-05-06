@@ -206,10 +206,12 @@ export default function InternoDashboard({ onBack }: Props) {
     endDate: undefined
   });
 
+  const [interactiveFilters, setInteractiveFilters] = useState<{ origin?: string; cancelReason?: string; month?: string; status?: string; }>({});
+
   const { 
     loading, error, statusData, funnelData, stackedStatusData, availableMonths, brokerTimeData, brokerActionsData, 
     originData, cancelReasons, brokerLeads, lineData, lineChartKeys, totalLeads, hottestStatusData 
-  } = useInternoDashboard(filters);
+  } = useInternoDashboard({ ...filters, interactiveFilters });
 
   const displayStatusData = statusData;
   const displayFunnelData = funnelData;
@@ -331,6 +333,34 @@ export default function InternoDashboard({ onBack }: Props) {
       </div>
 
       <main className="flex-1 p-6 overflow-y-auto">
+        {/* Render active filters */}
+        {Object.keys(interactiveFilters).filter(k => (interactiveFilters as any)[k] !== undefined).length > 0 && (
+          <div className="max-w-7xl mx-auto mb-4 flex items-center space-x-2 flex-wrap gap-y-2">
+            <span className="text-sm font-medium text-slate-400">Filtros Interativos:</span>
+            {interactiveFilters.origin && (
+              <span className="bg-blue-500/20 text-blue-400 text-xs px-3 py-1 rounded-full flex items-center cursor-pointer hover:bg-rose-500/20 hover:text-rose-400 transition-colors border border-blue-500/30" onClick={() => setInteractiveFilters(prev => ({ ...prev, origin: undefined }))}>
+                Origem: {interactiveFilters.origin} <span className="ml-1 text-[10px]">&times;</span>
+              </span>
+            )}
+            {interactiveFilters.cancelReason && (
+              <span className="bg-purple-500/20 text-purple-400 text-xs px-3 py-1 rounded-full flex items-center cursor-pointer hover:bg-rose-500/20 hover:text-rose-400 transition-colors border border-purple-500/30" onClick={() => setInteractiveFilters(prev => ({ ...prev, cancelReason: undefined }))}>
+                Motivo: {interactiveFilters.cancelReason} <span className="ml-1 text-[10px]">&times;</span>
+              </span>
+            )}
+            {interactiveFilters.month && (
+              <span className="bg-emerald-500/20 text-emerald-400 text-xs px-3 py-1 rounded-full flex items-center cursor-pointer hover:bg-rose-500/20 hover:text-rose-400 transition-colors border border-emerald-500/30" onClick={() => setInteractiveFilters(prev => ({ ...prev, month: undefined }))}>
+                Mês: {interactiveFilters.month} <span className="ml-1 text-[10px]">&times;</span>
+              </span>
+            )}
+            {interactiveFilters.status && (
+              <span className="bg-amber-500/20 text-amber-400 text-xs px-3 py-1 rounded-full flex items-center cursor-pointer hover:bg-rose-500/20 hover:text-rose-400 transition-colors border border-amber-500/30" onClick={() => setInteractiveFilters(prev => ({ ...prev, status: undefined }))}>
+                Status: {interactiveFilters.status} <span className="ml-1 text-[10px]">&times;</span>
+              </span>
+            )}
+            <button onClick={() => setInteractiveFilters({})} className="text-xs font-medium text-slate-400 hover:text-white underline ml-2 transition-colors">Limpar todos</button>
+          </div>
+        )}
+
         {activeTab === 'gerais' && (
           <div className="space-y-6 max-w-7xl mx-auto">
             {/* Top Row: Big Numbers */}
@@ -369,7 +399,19 @@ export default function InternoDashboard({ onBack }: Props) {
                     <Tooltip content={<CustomTooltip />} />
                     <Legend wrapperStyle={{ fontSize: '12px', color: '#94a3b8' }} verticalAlign="top" height={36} />
                     {displayAvailableMonths.map((month, idx) => (
-                      <Bar key={month} dataKey={month} stackId="a" fill={COLORS[idx % COLORS.length]} />
+                      <Bar 
+                        key={month} 
+                        dataKey={month} 
+                        stackId="a" 
+                        fill={COLORS[idx % COLORS.length]} 
+                        onClick={(data) => setInteractiveFilters(prev => ({ 
+                          ...prev, 
+                          month: prev.month === month && prev.status === data.status ? undefined : month, 
+                          status: prev.month === month && prev.status === data.status ? undefined : data.status 
+                        }))}
+                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                        style={{ cursor: 'pointer' }}
+                      />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
@@ -399,9 +441,12 @@ export default function InternoDashboard({ onBack }: Props) {
                         outerRadius={80}
                         innerRadius={40}
                         fill="#8884d8"
+                        onClick={(data) => setInteractiveFilters(prev => ({ ...prev, cancelReason: prev.cancelReason === data.reason ? undefined : data.reason }))}
+                        className="cursor-pointer"
+                        style={{ cursor: 'pointer' }}
                       >
                         {displayCancelReasons.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition-opacity outline-none" style={{ cursor: 'pointer' }} />
                         ))}
                       </Pie>
                       <Tooltip content={<CustomTooltip />} />
@@ -424,9 +469,12 @@ export default function InternoDashboard({ onBack }: Props) {
                         outerRadius={80}
                         innerRadius={40}
                         fill="#8884d8"
+                        onClick={(data) => setInteractiveFilters(prev => ({ ...prev, origin: prev.origin === data.name ? undefined : data.name }))}
+                        className="cursor-pointer"
+                        style={{ cursor: 'pointer' }}
                       >
                         {displayOriginData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition-opacity outline-none" style={{ cursor: 'pointer' }} />
                         ))}
                       </Pie>
                       <Tooltip content={<CustomTooltip />} />
