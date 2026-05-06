@@ -1,29 +1,13 @@
-import { createClient } from '@supabase/supabase-js';
-import * as dotenv from 'dotenv';
-dotenv.config();
+import { supabase } from './src/lib/supabase';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase credentials in .env');
-  process.exit(1);
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-async function checkColumns() {
-  console.log('Fetching one row from lead_milestones table to see all columns...');
+async function check() {
   const { data, error } = await supabase.from('lead_milestones').select('*').limit(1);
-  
-  if (error) {
-    console.error('Error fetching data:', error);
-  } else if (data && data.length > 0) {
-    console.log('Available columns in lead_milestones table:');
-    console.log(Object.keys(data[0]).join(', '));
-  } else {
-    console.log('Table is empty, but query succeeded.');
-  }
+  console.log("Milestones columns:", data ? Object.keys(data[0]) : error);
+  const { data: d2, error: e2 } = await supabase.from('view_lead_snapshot_mensal').select('*').limit(1);
+  console.log("Snapshot columns:", d2 ? Object.keys(d2[0]) : e2);
+  const { data: d3, error: e3 } = await supabase.from('view_tma_fila_atendimento').select('*').limit(1);
+  console.log("TMA columns:", d3 ? Object.keys(d3[0]) : e3);
+  const { data: d4, error: e4 } = await supabase.from('view_corretor_interacoes').select('*').limit(1);
+  console.log("Corretor interações columns:", d4 ? Object.keys(d4[0]) : e4);
 }
-
-checkColumns();
+check();
