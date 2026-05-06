@@ -100,11 +100,26 @@ const mockAdsTimeData = [
 
 // --- Components ---
 
+const CustomXAxisTick = ({ x, y, payload }: any) => {
+  const words = payload.value ? payload.value.split(' ') : [];
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} y={0} dy={16} textAnchor="middle" fill="#64748b" fontSize={11}>
+        {words.map((word: string, index: number) => (
+          <tspan x={0} dy={index === 0 ? 0 : 12} key={index}>
+            {word}
+          </tspan>
+        ))}
+      </text>
+    </g>
+  );
+};
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[#2a2d3d] border border-slate-700 p-3 rounded-lg shadow-xl">
-        <p className="text-slate-200 font-medium mb-2">{label}</p>
+      <div className="bg-white border border-slate-200 p-3 rounded-lg shadow-xl">
+        <p className="text-slate-900 font-medium mb-2">{label}</p>
         {payload.map((entry: any, index: number) => (
           <p key={index} style={{ color: entry.color }} className="text-sm">
             {entry.name}: {entry.value}
@@ -151,7 +166,7 @@ const CustomFunnel = ({ data, total }: { data: any[], total: number }) => {
           const percentage = total > 0 ? ((item.value / total) * 100).toFixed(2) : '0.00';
           return (
             <div key={idx} className="flex items-center justify-end pr-4 relative h-full">
-              <span className="text-xs font-medium text-slate-300 whitespace-nowrap z-10 bg-[#242731] px-1">
+              <span className="text-xs font-medium text-slate-600 whitespace-nowrap z-10 bg-white px-1">
                 {item.name} {item.value} ({percentage}%)
               </span>
               {/* Connecting line */}
@@ -183,7 +198,7 @@ const CustomFunnel = ({ data, total }: { data: any[], total: number }) => {
                 key={idx}
                 points={`${xTopLeft},${yTop} ${xTopRight},${yTop} ${xBottomRight},${yBottom} ${xBottomLeft},${yBottom}`}
                 fill={colors[idx % colors.length]}
-                stroke="#242731"
+                stroke="#ffffff"
                 strokeWidth="0.5"
               />
             );
@@ -198,9 +213,10 @@ export default function InternoDashboard({ onBack }: Props) {
   const { signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<'gerais' | 'corretores' | 'ads'>('gerais');
   const [filters, setFilters] = useState({ 
-    period: 'Este mês', 
+    period: 'Todo o período', 
     project: 'Todos', 
     broker: 'Todos',
+    origin: 'Todas',
     competence: 'Atual',
     startDate: undefined,
     endDate: undefined
@@ -234,38 +250,38 @@ export default function InternoDashboard({ onBack }: Props) {
   const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#eab308', '#ec4899', '#f43f5e', '#84cc16'];
 
   return (
-    <div className="min-h-screen bg-[#1a1c23] flex flex-col animate-in fade-in duration-500 font-sans text-slate-200">
+    <div className="min-h-screen bg-slate-50 flex flex-col animate-in fade-in duration-500 font-sans text-slate-900">
       {/* Header */}
-      <header className="bg-[#242731] border-b border-slate-800 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center space-x-4">
           <button 
             onClick={onBack}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
+            className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
             title="Voltar para seleção"
           >
             <ArrowLeft size={20} />
           </button>
-          <h1 className="text-xl font-bold text-white">Dashboard Interno Mkt</h1>
+          <h1 className="text-xl font-bold text-slate-900">Dashboard Interno Mkt</h1>
         </div>
         
-        <div className="flex bg-[#1a1c23] p-1 rounded-xl">
+        <div className="flex bg-slate-50 p-1 rounded-xl">
           <button
             onClick={() => setActiveTab('gerais')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 ${activeTab === 'gerais' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 ${activeTab === 'gerais' ? 'bg-[#61072E] text-white shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
           >
             <BarChart3 size={16} />
             <span>Resultados Gerais</span>
           </button>
           <button
             onClick={() => setActiveTab('corretores')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 ${activeTab === 'corretores' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 ${activeTab === 'corretores' ? 'bg-[#61072E] text-white shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
           >
             <Users size={16} />
             <span>Corretores</span>
           </button>
           <button
             onClick={() => setActiveTab('ads')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 ${activeTab === 'ads' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2 ${activeTab === 'ads' ? 'bg-[#61072E] text-white shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
           >
             <Megaphone size={16} />
             <span>Mídia Paga</span>
@@ -274,7 +290,7 @@ export default function InternoDashboard({ onBack }: Props) {
 
         <button
           onClick={signOut}
-          className="flex items-center space-x-2 text-slate-400 hover:text-rose-500 transition-colors px-3 py-2 rounded-xl hover:bg-rose-500/10"
+          className="flex items-center space-x-2 text-slate-500 hover:text-rose-500 transition-colors px-3 py-2 rounded-xl hover:bg-rose-500/10"
         >
           <LogOut size={18} />
           <span className="font-medium text-sm">Sair</span>
@@ -282,7 +298,7 @@ export default function InternoDashboard({ onBack }: Props) {
       </header>
 
       {/* Filters Bar */}
-      <div className="bg-[#242731] border-b border-slate-800 px-6 py-3 flex items-center space-x-4 flex-wrap gap-y-2 relative z-40">
+      <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center space-x-4 flex-wrap gap-y-2 relative z-40">
         <DateRangePicker 
           value={{ period: filters.period, startDate: filters.startDate, endDate: filters.endDate }}
           onChange={(range) => setFilters({ 
@@ -293,9 +309,9 @@ export default function InternoDashboard({ onBack }: Props) {
           })}
         />
 
-        <div className="flex items-center space-x-2 text-slate-400 bg-[#1a1c23] px-3 py-1.5 rounded-lg border border-slate-700">
+        <div className="flex items-center space-x-2 text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
           <select 
-            className="bg-transparent border-none outline-none text-sm text-slate-200"
+            className="bg-transparent border-none outline-none text-sm text-slate-900"
             value={filters.competence}
             onChange={(e) => setFilters({ ...filters, competence: e.target.value })}
           >
@@ -305,9 +321,9 @@ export default function InternoDashboard({ onBack }: Props) {
           </select>
         </div>
 
-        <div className="flex items-center space-x-2 text-slate-400 bg-[#1a1c23] px-3 py-1.5 rounded-lg border border-slate-700">
+        <div className="flex items-center space-x-2 text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
           <select 
-            className="bg-transparent border-none outline-none text-sm text-slate-200"
+            className="bg-transparent border-none outline-none text-sm text-slate-900"
             value={filters.project}
             onChange={(e) => setFilters({ ...filters, project: e.target.value })}
           >
@@ -318,9 +334,9 @@ export default function InternoDashboard({ onBack }: Props) {
           </select>
         </div>
         
-        <div className="flex items-center space-x-2 text-slate-400 bg-[#1a1c23] px-3 py-1.5 rounded-lg border border-slate-700">
+        <div className="flex items-center space-x-2 text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
           <select 
-            className="bg-transparent border-none outline-none text-sm text-slate-200"
+            className="bg-transparent border-none outline-none text-sm text-slate-900"
             value={filters.broker}
             onChange={(e) => setFilters({ ...filters, broker: e.target.value })}
           >
@@ -330,34 +346,48 @@ export default function InternoDashboard({ onBack }: Props) {
             <option value="Antonio Escada">Antonio Escada</option>
           </select>
         </div>
+
+        <div className="flex items-center space-x-2 text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+          <select 
+            className="bg-transparent border-none outline-none text-sm text-slate-900"
+            value={filters.origin || 'Todas'}
+            onChange={(e) => setFilters({ ...filters, origin: e.target.value })}
+          >
+            <option value="Todas">Todas as Origens</option>
+            <option value="Facebook">Facebook / Meta</option>
+            <option value="Google">Google</option>
+            <option value="Site">Site / Orgânico</option>
+            <option value="Outros">Outros</option>
+          </select>
+        </div>
       </div>
 
       <main className="flex-1 p-6 overflow-y-auto">
         {/* Render active filters */}
         {Object.keys(interactiveFilters).filter(k => (interactiveFilters as any)[k] !== undefined).length > 0 && (
           <div className="max-w-7xl mx-auto mb-4 flex items-center space-x-2 flex-wrap gap-y-2">
-            <span className="text-sm font-medium text-slate-400">Filtros Interativos:</span>
+            <span className="text-sm font-medium text-slate-500">Filtros Interativos:</span>
             {interactiveFilters.origin && (
-              <span className="bg-blue-500/20 text-blue-400 text-xs px-3 py-1 rounded-full flex items-center cursor-pointer hover:bg-rose-500/20 hover:text-rose-400 transition-colors border border-blue-500/30" onClick={() => setInteractiveFilters(prev => ({ ...prev, origin: undefined }))}>
+              <span className="bg-blue-50 text-blue-700 text-xs px-3 py-1 rounded-full flex items-center cursor-pointer hover:bg-rose-50 hover:text-rose-700 transition-colors border border-blue-200" onClick={() => setInteractiveFilters(prev => ({ ...prev, origin: undefined }))}>
                 Origem: {interactiveFilters.origin} <span className="ml-1 text-[10px]">&times;</span>
               </span>
             )}
             {interactiveFilters.cancelReason && (
-              <span className="bg-purple-500/20 text-purple-400 text-xs px-3 py-1 rounded-full flex items-center cursor-pointer hover:bg-rose-500/20 hover:text-rose-400 transition-colors border border-purple-500/30" onClick={() => setInteractiveFilters(prev => ({ ...prev, cancelReason: undefined }))}>
+              <span className="bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full flex items-center cursor-pointer hover:bg-rose-50 hover:text-rose-700 transition-colors border border-purple-200" onClick={() => setInteractiveFilters(prev => ({ ...prev, cancelReason: undefined }))}>
                 Motivo: {interactiveFilters.cancelReason} <span className="ml-1 text-[10px]">&times;</span>
               </span>
             )}
             {interactiveFilters.month && (
-              <span className="bg-emerald-500/20 text-emerald-400 text-xs px-3 py-1 rounded-full flex items-center cursor-pointer hover:bg-rose-500/20 hover:text-rose-400 transition-colors border border-emerald-500/30" onClick={() => setInteractiveFilters(prev => ({ ...prev, month: undefined }))}>
+              <span className="bg-emerald-50 text-emerald-700 text-xs px-3 py-1 rounded-full flex items-center cursor-pointer hover:bg-rose-50 hover:text-rose-700 transition-colors border border-emerald-200" onClick={() => setInteractiveFilters(prev => ({ ...prev, month: undefined }))}>
                 Mês: {interactiveFilters.month} <span className="ml-1 text-[10px]">&times;</span>
               </span>
             )}
             {interactiveFilters.status && (
-              <span className="bg-amber-500/20 text-amber-400 text-xs px-3 py-1 rounded-full flex items-center cursor-pointer hover:bg-rose-500/20 hover:text-rose-400 transition-colors border border-amber-500/30" onClick={() => setInteractiveFilters(prev => ({ ...prev, status: undefined }))}>
+              <span className="bg-amber-50 text-amber-700 text-xs px-3 py-1 rounded-full flex items-center cursor-pointer hover:bg-rose-50 hover:text-rose-700 transition-colors border border-amber-200" onClick={() => setInteractiveFilters(prev => ({ ...prev, status: undefined }))}>
                 Status: {interactiveFilters.status} <span className="ml-1 text-[10px]">&times;</span>
               </span>
             )}
-            <button onClick={() => setInteractiveFilters({})} className="text-xs font-medium text-slate-400 hover:text-white underline ml-2 transition-colors">Limpar todos</button>
+            <button onClick={() => setInteractiveFilters({})} className="text-xs font-medium text-slate-500 hover:text-slate-900 underline ml-2 transition-colors">Limpar todos</button>
           </div>
         )}
 
@@ -365,36 +395,36 @@ export default function InternoDashboard({ onBack }: Props) {
           <div className="space-y-6 max-w-7xl mx-auto">
             {/* Top Row: Big Numbers */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800 text-center flex flex-col justify-center items-center">
-                <p className="text-slate-400 text-xs font-medium mb-1 uppercase">Leads Totais</p>
+              <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
+                <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Leads Totais</p>
                 <p className="text-3xl font-bold text-white">{displayTotalLeads}</p>
               </div>
-              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800 text-center flex flex-col justify-center items-center">
-                <p className="text-slate-400 text-xs font-medium mb-1 uppercase">Agendamentos</p>
+              <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
+                <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Agendamentos</p>
                 <p className="text-3xl font-bold text-white">{displayAgendamentoCount}</p>
               </div>
-              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800 text-center flex flex-col justify-center items-center">
-                <p className="text-slate-400 text-xs font-medium mb-1 uppercase">Visitas</p>
+              <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
+                <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Visitas</p>
                 <p className="text-3xl font-bold text-white">{displayVisitaCount}</p>
               </div>
-              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800 text-center flex flex-col justify-center items-center">
-                <p className="text-slate-400 text-xs font-medium mb-1 uppercase">Propostas</p>
+              <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
+                <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Propostas</p>
                 <p className="text-3xl font-bold text-white">{displayPropostaCount}</p>
               </div>
-              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800 text-center flex flex-col justify-center items-center">
-                <p className="text-slate-400 text-xs font-medium mb-1 uppercase">Vendas Realizadas</p>
+              <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
+                <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Vendas Realizadas</p>
                 <p className="text-3xl font-bold text-white">{displayVendaCount}</p>
               </div>
             </div>
 
             {/* Row 2: Evolução de Status */}
-            <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
-              <h3 className="text-sm font-medium text-slate-400 mb-4">Evolução de Status no Mês</h3>
+            <div className="bg-white p-6 rounded-xl border border-slate-200">
+              <h3 className="text-sm font-medium text-slate-500 mb-4">Evolução de Status no Mês</h3>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={displayStackedStatusData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                    <XAxis dataKey="status" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} angle={-45} textAnchor="end" height={80} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                    <XAxis dataKey="status" stroke="#94a3b8" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={80} interval={0} />
                     <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend wrapperStyle={{ fontSize: '12px', color: '#94a3b8' }} verticalAlign="top" height={36} />
@@ -420,15 +450,15 @@ export default function InternoDashboard({ onBack }: Props) {
 
             {/* Row 3: Funnel & Pie Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
-                <h3 className="text-sm font-medium text-slate-400 mb-4">Funil Status Atual</h3>
+              <div className="bg-white p-6 rounded-xl border border-slate-200">
+                <h3 className="text-sm font-medium text-slate-500 mb-4">Funil Status Atual</h3>
                 <div className="h-64">
                   <CustomFunnel data={displayFunnelData} total={totalLeads || 1551} />
                 </div>
               </div>
 
-              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
-                <h3 className="text-sm font-medium text-slate-400 mb-4">Motivo Cancelamento</h3>
+              <div className="bg-white p-6 rounded-xl border border-slate-200">
+                <h3 className="text-sm font-medium text-slate-500 mb-4">Motivo Cancelamento</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -455,8 +485,8 @@ export default function InternoDashboard({ onBack }: Props) {
                 </div>
               </div>
 
-              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
-                <h3 className="text-sm font-medium text-slate-400 mb-4">Origem</h3>
+              <div className="bg-white p-6 rounded-xl border border-slate-200">
+                <h3 className="text-sm font-medium text-slate-500 mb-4">Origem</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -485,12 +515,12 @@ export default function InternoDashboard({ onBack }: Props) {
             </div>
 
             {/* Line Chart Row */}
-            <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
-              <h3 className="text-sm font-medium text-slate-400 mb-4">Evolução de Leads por Empreendimento</h3>
+            <div className="bg-white p-6 rounded-xl border border-slate-200">
+              <h3 className="text-sm font-medium text-slate-500 mb-4">Evolução de Leads por Empreendimento</h3>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={displayLineData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                       <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                       <Tooltip content={<CustomTooltip />} />
@@ -512,12 +542,12 @@ export default function InternoDashboard({ onBack }: Props) {
 
             {/* Brokers Row */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              <div className="lg:col-span-3 bg-[#242731] p-6 rounded-xl border border-slate-800">
-                <h3 className="text-sm font-medium text-slate-400 mb-4">Leads por Corretor</h3>
+              <div className="lg:col-span-3 bg-white p-6 rounded-xl border border-slate-200">
+                <h3 className="text-sm font-medium text-slate-500 mb-4">Leads por Corretor</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={displayBrokerLeads} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
                       <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                       <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} width={150} />
                       <Tooltip content={<CustomTooltip />} />
@@ -527,21 +557,21 @@ export default function InternoDashboard({ onBack }: Props) {
                 </div>
               </div>
               <div className="space-y-4 flex flex-col justify-center">
-                <div className="bg-[#242731] p-4 rounded-xl border border-slate-800 text-center flex-1 flex flex-col justify-center">
-                  <p className="text-slate-400 text-sm font-medium mb-1">Tayumi</p>
-                  <p className="text-3xl font-bold text-white">
+                <div className="bg-white p-4 rounded-xl border border-slate-200 text-center flex-1 flex flex-col justify-center">
+                  <p className="text-slate-500 text-sm font-medium mb-1">Tayumi</p>
+                  <p className="text-3xl font-bold text-slate-900">
                     {displayBrokerLeads.find(b => b.name.toUpperCase().includes('TAYUMI'))?.value || 0}
                   </p>
                 </div>
-                <div className="bg-[#242731] p-4 rounded-xl border border-slate-800 text-center flex-1 flex flex-col justify-center">
-                  <p className="text-slate-400 text-sm font-medium mb-1">Fabio Binotti</p>
-                  <p className="text-3xl font-bold text-white">
+                <div className="bg-white p-4 rounded-xl border border-slate-200 text-center flex-1 flex flex-col justify-center">
+                  <p className="text-slate-500 text-sm font-medium mb-1">Fabio Binotti</p>
+                  <p className="text-3xl font-bold text-slate-900">
                     {displayBrokerLeads.find(b => b.name.toUpperCase().includes('FABIO BINOTTI'))?.value || 0}
                   </p>
                 </div>
-                <div className="bg-[#242731] p-4 rounded-xl border border-slate-800 text-center flex-1 flex flex-col justify-center">
-                  <p className="text-slate-400 text-sm font-medium mb-1">Stand Virtual</p>
-                  <p className="text-3xl font-bold text-white">
+                <div className="bg-white p-4 rounded-xl border border-slate-200 text-center flex-1 flex flex-col justify-center">
+                  <p className="text-slate-500 text-sm font-medium mb-1">Stand Virtual</p>
+                  <p className="text-3xl font-bold text-slate-900">
                     {displayBrokerLeads.find(b => b.name.toUpperCase().includes('STAND VIRTUAL'))?.value || 0}
                   </p>
                 </div>
@@ -552,12 +582,12 @@ export default function InternoDashboard({ onBack }: Props) {
 
         {activeTab === 'corretores' && (
           <div className="space-y-6 max-w-7xl mx-auto">
-            <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
-              <h3 className="text-sm font-medium text-slate-400 mb-4">Tempo Médio de Recepção do Lead (Horas)</h3>
+            <div className="bg-white p-6 rounded-xl border border-slate-200">
+              <h3 className="text-sm font-medium text-slate-500 mb-4">Tempo Médio de Recepção do Lead (Horas)</h3>
               <div className="h-96">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={displayBrokerTime} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
                     <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                     <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} width={120} />
                     <Tooltip content={<CustomTooltip />} />
@@ -567,12 +597,12 @@ export default function InternoDashboard({ onBack }: Props) {
               </div>
             </div>
 
-            <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
-              <h3 className="text-sm font-medium text-slate-400 mb-4">Ações no CV</h3>
+            <div className="bg-white p-6 rounded-xl border border-slate-200">
+              <h3 className="text-sm font-medium text-slate-500 mb-4">Ações no CV</h3>
               <div className="h-96">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={displayBrokerActions} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
                     <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                     <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} width={120} />
                     <Tooltip content={<CustomTooltip />} />
@@ -589,61 +619,61 @@ export default function InternoDashboard({ onBack }: Props) {
             {/* KPIs */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Meta Ads */}
-              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
+              <div className="bg-white p-6 rounded-xl border border-slate-200">
                 <div className="flex items-center space-x-3 mb-6">
-                  <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                  <div className="w-8 h-8 bg-[#61072E] rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-slate-900" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
                   </div>
-                  <h2 className="text-xl font-bold text-white">Meta Ads</h2>
+                  <h2 className="text-xl font-bold text-slate-900">Meta Ads</h2>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <p className="text-slate-400 text-xs font-medium mb-1">Leads</p>
-                    <p className="text-[0.9rem] font-bold text-white">638</p>
+                    <p className="text-slate-500 text-xs font-medium mb-1">Leads</p>
+                    <p className="text-[0.9rem] font-bold text-slate-900">638</p>
                   </div>
                   <div>
-                    <p className="text-slate-400 text-xs font-medium mb-1">CPL</p>
-                    <p className="text-[0.9rem] font-bold text-white">R$ 120,68</p>
+                    <p className="text-slate-500 text-xs font-medium mb-1">CPL</p>
+                    <p className="text-[0.9rem] font-bold text-slate-900">R$ 120,68</p>
                   </div>
                   <div>
-                    <p className="text-slate-400 text-xs font-medium mb-1">Total Gasto</p>
-                    <p className="text-[0.9rem] font-bold text-white">R$ 76.992,33</p>
+                    <p className="text-slate-500 text-xs font-medium mb-1">Total Gasto</p>
+                    <p className="text-[0.9rem] font-bold text-slate-900">R$ 76.992,33</p>
                   </div>
                 </div>
               </div>
 
               {/* Google Ads */}
-              <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
+              <div className="bg-white p-6 rounded-xl border border-slate-200">
                 <div className="flex items-center space-x-3 mb-6">
                   <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
                     <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.745 12.27c0-.827-.074-1.624-.213-2.395H12v4.527h6.585a5.636 5.636 0 0 1-2.445 3.696v3.07h3.957c2.315-2.131 3.648-5.274 3.648-8.898z"/><path fill="#34A853" d="M12 24c3.305 0 6.075-1.095 8.102-2.962l-3.957-3.07c-1.095.734-2.495 1.168-4.145 1.168-3.188 0-5.885-2.152-6.845-5.044H1.055v3.174C3.082 21.31 7.205 24 12 24z"/><path fill="#FBBC05" d="M5.155 14.092A7.18 7.18 0 0 1 4.79 12c0-.734.13-1.446.365-2.092V6.734H1.055A11.96 11.96 0 0 0 0 12c0 1.936.465 3.764 1.285 5.408l3.87-3.316z"/><path fill="#EA4335" d="M12 4.832c1.796 0 3.41.618 4.678 1.83l3.51-3.51C18.07 1.205 15.305 0 12 0 7.205 0 3.082 2.69 1.055 6.734l3.87 3.316c.96-2.892 3.657-5.044 6.845-5.044z"/></svg>
                   </div>
-                  <h2 className="text-xl font-bold text-white">Google Ads</h2>
+                  <h2 className="text-xl font-bold text-slate-900">Google Ads</h2>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <p className="text-slate-400 text-xs font-medium mb-1">Conversions</p>
-                    <p className="text-[0.9rem] font-bold text-white">194</p>
+                    <p className="text-slate-500 text-xs font-medium mb-1">Conversions</p>
+                    <p className="text-[0.9rem] font-bold text-slate-900">194</p>
                   </div>
                   <div>
-                    <p className="text-slate-400 text-xs font-medium mb-1">CPL</p>
-                    <p className="text-[0.9rem] font-bold text-white">R$ 129,91</p>
+                    <p className="text-slate-500 text-xs font-medium mb-1">CPL</p>
+                    <p className="text-[0.9rem] font-bold text-slate-900">R$ 129,91</p>
                   </div>
                   <div>
-                    <p className="text-slate-400 text-xs font-medium mb-1">Cost (Spend)</p>
-                    <p className="text-[0.9rem] font-bold text-white">R$ 25.202,73</p>
+                    <p className="text-slate-500 text-xs font-medium mb-1">Cost (Spend)</p>
+                    <p className="text-[0.9rem] font-bold text-slate-900">R$ 25.202,73</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Stacked Bar Chart */}
-            <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
-              <h3 className="text-sm font-medium text-slate-400 mb-4">Leads por Empreendimento (Meta vs Google)</h3>
+            <div className="bg-white p-6 rounded-xl border border-slate-200">
+              <h3 className="text-sm font-medium text-slate-500 mb-4">Leads por Empreendimento (Meta vs Google)</h3>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={mockAdsProjectData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                     <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                     <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                     <Tooltip content={<CustomTooltip />} />
@@ -656,12 +686,12 @@ export default function InternoDashboard({ onBack }: Props) {
             </div>
 
             {/* Line Chart */}
-            <div className="bg-[#242731] p-6 rounded-xl border border-slate-800">
-              <h3 className="text-sm font-medium text-slate-400 mb-4">Evolução de Leads (Meta vs Google)</h3>
+            <div className="bg-white p-6 rounded-xl border border-slate-200">
+              <h3 className="text-sm font-medium text-slate-500 mb-4">Evolução de Leads (Meta vs Google)</h3>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={mockAdsTimeData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                     <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                     <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                     <Tooltip content={<CustomTooltip />} />
