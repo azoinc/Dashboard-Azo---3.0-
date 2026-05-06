@@ -53,9 +53,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
           startDate = new Date(2025, 11, 1); // December 1, 2025
         } else if (filters.period === 'Últimos 30 dias') {
           startDate.setDate(now.getDate() - 30);
-        } else if (filters.period === 'Este mês') {
+        } else if (filters.period === 'Este mês' || filters.period === 'Mês Atual') {
           startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        } else if (filters.period === 'Mês passado') {
+        } else if (filters.period === 'Mês passado' || filters.period === 'Mês Passado') {
           startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
           endDate = new Date(now.getFullYear(), now.getMonth(), 0);
         } else if (filters.period === 'Personalizado' && filters.startDate && filters.endDate) {
@@ -63,7 +63,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
           endDate = new Date(`${filters.endDate}T23:59:59.999`);
         } else {
           // Default fallback
-          startDate = new Date(2025, 11, 1);
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         }
 
         const formatYYYYMMDDEnd = (date: Date) => {
@@ -84,7 +84,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
         const applyProjectFilter = (query: any) => {
           if (filters.project !== 'Todos') {
-            return query.eq('empreendimento', filters.project);
+            return query.ilike('empreendimento', `%${filters.project}%`);
           } else if (filters.city && filters.city !== 'ALL') {
             const cityProjects = PROJECTS_BY_CITY[filters.city as keyof typeof PROJECTS_BY_CITY];
             if (cityProjects && cityProjects.length > 0) {
@@ -104,11 +104,11 @@ export function useInternoDashboard(filters: DashboardFilters) {
             .select('status_final_mes, id_cv, lead_data_cad, origem, corretor, empreendimento')
             .gte('lead_data_cad', startDateStr)
             .lte('lead_data_cad', endDateStr)
-            .eq('competencia_data', filters.competence);
+            .like('competencia_data', `${filters.competence.substring(0, 7)}%`);
 
           snapshotQuery = applyProjectFilter(snapshotQuery);
           if (filters.broker !== 'Todos') {
-            snapshotQuery = snapshotQuery.eq('corretor', filters.broker);
+            snapshotQuery = snapshotQuery.ilike('corretor', `%${filters.broker}%`);
           }
 
           const { data, error } = await snapshotQuery;
@@ -133,7 +133,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
           leadsQuery = applyProjectFilter(leadsQuery);
           if (filters.broker !== 'Todos') {
-            leadsQuery = leadsQuery.eq('corretor', filters.broker);
+            leadsQuery = leadsQuery.ilike('corretor', `%${filters.broker}%`);
           }
 
           const { data, error } = await leadsQuery;
@@ -227,65 +227,64 @@ export function useInternoDashboard(filters: DashboardFilters) {
             .map(entry => entry[0]);
           setLineChartKeys(sortedEmpKeys);
 
-          // --- Fetch Milestones, Snapshots & Funnel in chunks ---
-          const leadIds = leadsData.map(l => l.id);
-          const chunkSize = 500;
+          // --- Funnel & Hottest Status (One Query) ---
+          let funnelQuery = supabase
+            .from('view_funil_maximo_com_total')
+            .select('etapa_visual, lead_id')
+            .gte('safra_data', startDateStr)
+            .lte('safra_data', endDateStr);
+
+          funnelQuery = applyProjectFilter(funnelQuery);
+          if (filters.broker !== 'Todos') {
+            funnelQuery = funnelQuery.ilike('corretor', `%${filters.broker}%`);
+          }
           
-          const leadHottestStatus = new Map<string, number>();
-          const snapshotDataAll: any[] = [];
-          const funnelCounts: Record<string, Set<string>> = {};
+          const funnelPromise = funnelQuery;
+
+          // --- Snapshots in Parallel Chunks ---
+          const leadIds = leadsData.map(l => l.id);
+          const chunkSize = 1000;
+          const snapshotPromises = [];
 
           for (let i = 0; i < leadIds.length; i += chunkSize) {
-            const chunk = leadIds.slice(i, i + chunkSize);
-            
-            // Milestones
-            const { data: milestonesData } = await supabase
-              .from('lead_milestones')
-              .select('lead_id, para_nome')
-              .in('lead_id', chunk);
-              
-            if (milestonesData) {
-              milestonesData.forEach(m => {
-                const fase = m.para_nome?.toLowerCase() || '';
+            snapshotPromises.push(
+              supabase
+                .from('view_lead_snapshot_mensal')
+                .select('status_final_mes, competencia_data, lead_id')
+                .in('lead_id', leadIds.slice(i, i + chunkSize))
+            );
+          }
+
+          // Await everything in parallel
+          const [funnelRes, ...snapshotRes] = await Promise.all([funnelPromise, ...snapshotPromises]);
+          
+          // Process Funnel & Hottest Status
+          const funnelCounts: Record<string, Set<string>> = {};
+          const leadHottestStatus = new Map<string, number>();
+
+          if (!funnelRes.error && funnelRes.data) {
+            funnelRes.data.forEach(row => {
+              const etapa = row.etapa_visual;
+              const leadId = row.lead_id;
+              if (etapa && leadId) {
+                if (!funnelCounts[etapa]) {
+                  funnelCounts[etapa] = new Set();
+                }
+                funnelCounts[etapa].add(leadId);
+
+                const fase = etapa.toLowerCase();
                 let score = 0;
                 if (fase.includes('visita')) score = 2;
                 else if (fase.includes('agendamento') || fase.includes('agendado')) score = 1;
                 
-                const currentScore = leadHottestStatus.get(m.lead_id) || 0;
+                const currentScore = leadHottestStatus.get(leadId) || 0;
                 if (score > currentScore) {
-                  leadHottestStatus.set(m.lead_id, score);
+                  leadHottestStatus.set(leadId, score);
                 }
-              });
-            }
-
-            // Snapshots
-            const { data: snapshotData } = await supabase
-              .from('view_lead_snapshot_mensal')
-              .select('status_final_mes, competencia_data, lead_id')
-              .in('lead_id', chunk);
-              
-            if (snapshotData) {
-              snapshotDataAll.push(...snapshotData);
-            }
-
-            // Funnel
-            const { data: funnelDataChunk } = await supabase
-              .from('view_funil_maximo_com_total')
-              .select('etapa_visual, lead_id')
-              .in('lead_id', chunk);
-
-            if (funnelDataChunk) {
-              funnelDataChunk.forEach(row => {
-                const etapa = row.etapa_visual;
-                const leadId = row.lead_id;
-                if (etapa && leadId) {
-                  if (!funnelCounts[etapa]) {
-                    funnelCounts[etapa] = new Set();
-                  }
-                  funnelCounts[etapa].add(leadId);
-                }
-              });
-            }
+              }
+            });
+          } else if (funnelRes.error) {
+             console.error("Funnel error:", funnelRes.error);
           }
 
           const sortedFunnelData = Object.entries(funnelCounts)
@@ -294,13 +293,11 @@ export function useInternoDashboard(filters: DashboardFilters) {
             
           setFunnelData(sortedFunnelData);
           
-          // Update total leads if the funnel has a total stage
           const totalStage = sortedFunnelData.find(item => item.name.includes('Total de Leads'));
           if (totalStage) {
             setTotalLeads(totalStage.value);
           }
 
-          // Process Hottest Status
           let vCount = 0;
           let aCount = 0;
           leadHottestStatus.forEach(score => {
@@ -309,7 +306,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
           });
           setHottestStatusData({ visita: vCount, agendamento: aCount });
 
-          // Process Stacked Bar Chart
+          // Process Snapshots
+          const snapshotDataAll = snapshotRes.flatMap(res => res.data || []);
           const stackedDataMap = new Map<string, Map<string, Set<string>>>();
           const monthsSet = new Set<string>();
           const monthRawMap = new Map<string, string>();
@@ -370,7 +368,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
           
         tmaQuery = applyProjectFilter(tmaQuery);
         if (filters.broker !== 'Todos') {
-          tmaQuery = tmaQuery.eq('corretor', filters.broker);
+          tmaQuery = tmaQuery.ilike('corretor', `%${filters.broker}%`);
         }
 
         const { data: tmaData, error: tmaError } = await tmaQuery;
@@ -395,7 +393,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
           
         actionsQuery = applyProjectFilter(actionsQuery);
         if (filters.broker !== 'Todos') {
-          actionsQuery = actionsQuery.eq('corretor', filters.broker);
+          actionsQuery = actionsQuery.ilike('corretor', `%${filters.broker}%`);
         }
 
         const { data: actionsData, error: actionsError } = await actionsQuery;
