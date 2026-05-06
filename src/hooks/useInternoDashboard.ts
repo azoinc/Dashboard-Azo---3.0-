@@ -30,7 +30,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
   const [lineChartKeys, setLineChartKeys] = useState<string[]>([]);
   
   const [totalLeads, setTotalLeads] = useState(0);
-  const [hottestStatusData, setHottestStatusData] = useState({ visita: 0, agendamento: 0 });
+  const [hottestStatusData, setHottestStatusData] = useState({ visita: 0, agendamento: 0, proposta: 0, venda: 0 });
 
   useEffect(() => {
     async function fetchData() {
@@ -84,7 +84,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
         const applyProjectFilter = (query: any) => {
           if (filters.project !== 'Todos') {
-            return query.ilike('empreendimento', `%${filters.project}%`);
+            return (query as any).ilike('empreendimento', `%${filters.project}%`);
           } else if (filters.city && filters.city !== 'ALL') {
             const cityProjects = PROJECTS_BY_CITY[filters.city as keyof typeof PROJECTS_BY_CITY];
             if (cityProjects && cityProjects.length > 0) {
@@ -103,12 +103,13 @@ export function useInternoDashboard(filters: DashboardFilters) {
             .from('view_lead_snapshot_mensal')
             .select('status_final_mes, id_cv, lead_data_cad, origem, corretor, empreendimento')
             .gte('lead_data_cad', startDateStr)
-            .lte('lead_data_cad', endDateStr)
-            .like('competencia_data', `${filters.competence.substring(0, 7)}%`);
+            .lte('lead_data_cad', endDateStr);
+            
+          snapshotQuery = (snapshotQuery as any).like('competencia_data', `${filters.competence.substring(0, 7)}%`);
 
           snapshotQuery = applyProjectFilter(snapshotQuery);
           if (filters.broker !== 'Todos') {
-            snapshotQuery = snapshotQuery.ilike('corretor', `%${filters.broker}%`);
+            snapshotQuery = (snapshotQuery as any).ilike('corretor', `%${filters.broker}%`);
           }
 
           const { data, error } = await snapshotQuery;
@@ -118,7 +119,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
           leadsData = data?.map(item => ({
             status_atual: item.status_final_mes,
             id: item.id_cv,
-            lead_data_cad: item.data_criacao_cv,
+            lead_data_cad: item.lead_data_cad,
             origem: item.origem,
             motivo_cancelamento: null, // Not available in snapshot view
             corretor: item.corretor,
@@ -133,7 +134,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
           leadsQuery = applyProjectFilter(leadsQuery);
           if (filters.broker !== 'Todos') {
-            leadsQuery = leadsQuery.ilike('corretor', `%${filters.broker}%`);
+            leadsQuery = (leadsQuery as any).ilike('corretor', `%${filters.broker}%`);
           }
 
           const { data, error } = await leadsQuery;
@@ -236,7 +237,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
           funnelQuery = applyProjectFilter(funnelQuery);
           if (filters.broker !== 'Todos') {
-            funnelQuery = funnelQuery.ilike('corretor', `%${filters.broker}%`);
+            funnelQuery = (funnelQuery as any).ilike('corretor', `%${filters.broker}%`);
           }
           
           const funnelPromise = funnelQuery;
@@ -274,7 +275,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
                 const fase = etapa.toLowerCase();
                 let score = 0;
-                if (fase.includes('visita')) score = 2;
+                if (fase.includes('venda')) score = 4;
+                else if (fase.includes('proposta') || fase.includes('negocia')) score = 3;
+                else if (fase.includes('visita')) score = 2;
                 else if (fase.includes('agendamento') || fase.includes('agendado')) score = 1;
                 
                 const currentScore = leadHottestStatus.get(leadId) || 0;
@@ -298,13 +301,17 @@ export function useInternoDashboard(filters: DashboardFilters) {
             setTotalLeads(totalStage.value);
           }
 
-          let vCount = 0;
-          let aCount = 0;
+          let rCount = 0; // Vendas
+          let pCount = 0; // Propostas
+          let vCount = 0; // Visitas
+          let aCount = 0; // Agendamento
           leadHottestStatus.forEach(score => {
+            if (score >= 4) rCount++;
+            if (score >= 3) pCount++;
             if (score >= 2) vCount++;
             if (score >= 1) aCount++;
           });
-          setHottestStatusData({ visita: vCount, agendamento: aCount });
+          setHottestStatusData({ visita: vCount, agendamento: aCount, proposta: pCount, venda: rCount });
 
           // Process Snapshots
           const snapshotDataAll = snapshotRes.flatMap(res => res.data || []);
@@ -314,6 +321,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
           snapshotDataAll.forEach(row => {
             const status = row.status_final_mes || 'Sem Status';
+            if (status.toLowerCase().includes('ação') || status.toLowerCase().includes('acao')) return; // exclude ação de marketing/etc.
             const compData = row.competencia_data;
             if (!compData) return;
             
@@ -368,7 +376,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
           
         tmaQuery = applyProjectFilter(tmaQuery);
         if (filters.broker !== 'Todos') {
-          tmaQuery = tmaQuery.ilike('corretor', `%${filters.broker}%`);
+          tmaQuery = (tmaQuery as any).ilike('corretor', `%${filters.broker}%`);
         }
 
         const { data: tmaData, error: tmaError } = await tmaQuery;
@@ -393,7 +401,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
           
         actionsQuery = applyProjectFilter(actionsQuery);
         if (filters.broker !== 'Todos') {
-          actionsQuery = actionsQuery.ilike('corretor', `%${filters.broker}%`);
+          actionsQuery = (actionsQuery as any).ilike('corretor', `%${filters.broker}%`);
         }
 
         const { data: actionsData, error: actionsError } = await actionsQuery;
