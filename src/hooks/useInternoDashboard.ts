@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import localforage from 'localforage';
 import { supabase } from '../lib/supabase';
 import { PROJECTS_BY_CITY } from '../types';
 
@@ -35,6 +36,26 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
       setLoading(true);
       setError(null);
+
+      const cacheKey = `dashboardCache_${JSON.stringify({
+        period: filters.period,
+        project: filters.project,
+        broker: filters.broker,
+        competence: filters.competence,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        city: filters.city
+      })}`;
+
+      try {
+        const cachedRawData = await localforage.getItem(cacheKey);
+        if (cachedRawData) {
+          setRawData(cachedRawData);
+          setLoading(false); // Update UI immediately from cache
+        }
+      } catch (e) {
+        console.error('Cache read error', e);
+      }
 
       try {
         const now = new Date();
@@ -187,13 +208,21 @@ export function useInternoDashboard(filters: DashboardFilters) {
         }
         const { data: actionsData, error: actionsError } = await actionsQuery;
 
-        setRawData({
+        const newRawData = {
           leadsData: leadsData || [],
           funnelRes,
           snapshotRes,
           tmaData: (!tmaError && tmaData) ? tmaData : [],
           actionsData: (!actionsError && actionsData) ? actionsData : []
-        });
+        };
+
+        setRawData(newRawData);
+
+        try {
+          await localforage.setItem(cacheKey, newRawData);
+        } catch (e) {
+          console.error("Cache write error", e);
+        }
 
       } catch (err: any) {
         console.error('Error fetching dashboard data:', err);
