@@ -66,15 +66,21 @@ export function useInternoDashboard(filters: DashboardFilters) {
           startDate = new Date(2025, 11, 1);
         }
 
-        const formatYYYYMMDD = (date: Date) => {
+        const formatYYYYMMDDEnd = (date: Date) => {
           const y = date.getFullYear();
           const m = String(date.getMonth() + 1).padStart(2, '0');
           const d = String(date.getDate()).padStart(2, '0');
-          return `${y}-${m}-${d}`;
+          return `${y}-${m}-${d}T23:59:59.999Z`;
+        };
+        const formatYYYYMMDDStart = (date: Date) => {
+          const y = date.getFullYear();
+          const m = String(date.getMonth() + 1).padStart(2, '0');
+          const d = String(date.getDate()).padStart(2, '0');
+          return `${y}-${m}-${d}T00:00:00.000Z`;
         };
 
-        const startDateStr = formatYYYYMMDD(startDate);
-        const endDateStr = formatYYYYMMDD(endDate);
+        const startDateStr = formatYYYYMMDDStart(startDate);
+        const endDateStr = formatYYYYMMDDEnd(endDate);
 
         const applyProjectFilter = (query: any) => {
           if (filters.project !== 'Todos') {
@@ -221,57 +227,13 @@ export function useInternoDashboard(filters: DashboardFilters) {
             .map(entry => entry[0]);
           setLineChartKeys(sortedEmpKeys);
 
-          // --- Funnel Data from view_funil_maximo_com_total ---
-          let funnelQuery = supabase
-            .from('view_funil_maximo_com_total')
-            .select('etapa_visual, lead_id')
-            .gte('safra_data', startDateStr)
-            .lte('safra_data', endDateStr);
-
-          funnelQuery = applyProjectFilter(funnelQuery);
-          if (filters.broker !== 'Todos') {
-            funnelQuery = funnelQuery.eq('corretor', filters.broker);
-          }
-          
-          const { data: funnelViewData, error: funnelError } = await funnelQuery;
-          
-          if (!funnelError && funnelViewData) {
-            const funnelCounts: Record<string, Set<string>> = {};
-            
-            funnelViewData.forEach(row => {
-              const etapa = row.etapa_visual;
-              const leadId = row.lead_id;
-              if (etapa && leadId) {
-                if (!funnelCounts[etapa]) {
-                  funnelCounts[etapa] = new Set();
-                }
-                funnelCounts[etapa].add(leadId);
-              }
-            });
-
-            const sortedFunnelData = Object.entries(funnelCounts)
-              .sort((a, b) => a[0].localeCompare(b[0]))
-              .map(([name, dataSet]) => ({ name, value: dataSet.size }));
-              
-            setFunnelData(sortedFunnelData);
-            
-            // Update total leads if the funnel has a total stage
-            const totalStage = sortedFunnelData.find(item => item.name.includes('Total de Leads'));
-            if (totalStage) {
-              setTotalLeads(totalStage.value);
-            }
-          } else {
-            console.error('Error fetching funnel data:', funnelError);
-            console.error('Funnel error details:', JSON.stringify(funnelError, null, 2));
-            setFunnelData([]);
-          }
-
-          // --- Fetch Milestones & Snapshots in chunks ---
+          // --- Fetch Milestones, Snapshots & Funnel in chunks ---
           const leadIds = leadsData.map(l => l.id);
           const chunkSize = 500;
           
           const leadHottestStatus = new Map<string, number>();
           const snapshotDataAll: any[] = [];
+          const funnelCounts: Record<string, Set<string>> = {};
 
           for (let i = 0; i < leadIds.length; i += chunkSize) {
             const chunk = leadIds.slice(i, i + chunkSize);
@@ -305,14 +267,45 @@ export function useInternoDashboard(filters: DashboardFilters) {
             if (snapshotData) {
               snapshotDataAll.push(...snapshotData);
             }
+
+            // Funnel
+            const { data: funnelDataChunk } = await supabase
+              .from('view_funil_maximo_com_total')
+              .select('etapa_visual, lead_id')
+              .in('lead_id', chunk);
+
+            if (funnelDataChunk) {
+              funnelDataChunk.forEach(row => {
+                const etapa = row.etapa_visual;
+                const leadId = row.lead_id;
+                if (etapa && leadId) {
+                  if (!funnelCounts[etapa]) {
+                    funnelCounts[etapa] = new Set();
+                  }
+                  funnelCounts[etapa].add(leadId);
+                }
+              });
+            }
+          }
+
+          const sortedFunnelData = Object.entries(funnelCounts)
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([name, dataSet]) => ({ name, value: dataSet.size }));
+            
+          setFunnelData(sortedFunnelData);
+          
+          // Update total leads if the funnel has a total stage
+          const totalStage = sortedFunnelData.find(item => item.name.includes('Total de Leads'));
+          if (totalStage) {
+            setTotalLeads(totalStage.value);
           }
 
           // Process Hottest Status
           let vCount = 0;
           let aCount = 0;
           leadHottestStatus.forEach(score => {
-            if (score === 2) vCount++;
-            if (score === 1) aCount++;
+            if (score >= 2) vCount++;
+            if (score >= 1) aCount++;
           });
           setHottestStatusData({ visita: vCount, agendamento: aCount });
 
