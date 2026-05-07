@@ -43,6 +43,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
       setLoading(true);
       setError(null);
+      // We do not clear rawData manually here because we want to see the cached data immediately if available,
+      // but if the fetch fails, we should clear it.
 
       const cacheKey = `dashboardCache_${JSON.stringify({
         period: filters.period,
@@ -59,9 +61,12 @@ export function useInternoDashboard(filters: DashboardFilters) {
         if (cachedRawData) {
           setRawData(cachedRawData);
           setLoading(false); // Update UI immediately from cache
+        } else {
+          setRawData(null); // Clear old data if no cache
         }
       } catch (e) {
         console.error('Cache read error', e);
+        setRawData(null);
       }
 
       try {
@@ -118,7 +123,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
         if (filters.competence && filters.competence !== 'Atual') {
           let snapshotQuery = supabase
             .from('view_lead_snapshot_mensal')
-            .select('status_final_mes, id_cv, lead_data_cad, origem, corretor, empreendimento')
+            .select('status_final_mes, lead_id, lead_data_cad, origem, corretor, empreendimento')
             .gte('lead_data_cad', startDateStr)
             .lte('lead_data_cad', endDateStr);
             
@@ -129,11 +134,14 @@ export function useInternoDashboard(filters: DashboardFilters) {
           }
 
           const { data, error } = await snapshotQuery;
-          if (error) throw error;
+          if (error) {
+            console.error('Snapshot query error:', error);
+            throw error;
+          }
           
           leadsData = data?.map((item: any) => ({
             status_atual: item.status_final_mes,
-            id: item.id_cv,
+            id: item.lead_id,
             lead_data_cad: item.lead_data_cad,
             origem: item.origem,
             motivo_cancelamento: null,
@@ -168,59 +176,79 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
         let funnelRes = { data: [] as any[], error: null };
         let snapshotRes: any[] = [];
+        let tmaData: any[] = [];
+        let actionsData: any[] = [];
 
         if (leadsData && leadsData.length > 0) {
-           let funnelQuery = supabase
-            .from('view_funil_maximo_com_total')
-            .select('etapa_visual, lead_id')
-            .gte('safra_data', startDateStr)
-            .lte('safra_data', endDateStr);
-
-           funnelQuery = applyProjectFilter(funnelQuery);
-           if (filters.broker !== 'Todos') {
-             funnelQuery = (funnelQuery as any).ilike('corretor', `%${filters.broker}%`);
-           }
-           
-           const funnelPromise = funnelQuery;
-
            const leadIds = leadsData.map(l => l.id);
            const chunkSize = 1000;
            const snapshotPromises = [];
+           const funnelPromises = [];
+           const tmaPromises = [];
+           const actionsPromises = [];
 
            for (let i = 0; i < leadIds.length; i += chunkSize) {
+             const chunk = leadIds.slice(i, i + chunkSize);
+             
              snapshotPromises.push(
                supabase
                  .from('view_lead_snapshot_mensal')
                  .select('status_final_mes, competencia_data, lead_id')
-                 .in('lead_id', leadIds.slice(i, i + chunkSize))
+                 .in('lead_id', chunk)
+             );
+             
+             funnelPromises.push(
+               supabase
+                 .from('view_funil_maximo_com_total')
+                 .select('etapa_visual, lead_id')
+                 .in('lead_id', chunk)
+             );
+             
+             tmaPromises.push(
+               supabase
+                 .from('view_tma_fila_atendimento')
+                 .select('corretor, segundos_espera')
+                 .in('lead_id', chunk)
+             );
+             
+             actionsPromises.push(
+               supabase
+                 .from('view_esforco_corretor')
+                 .select('corretor, lead_id')
+                 .in('lead_id', chunk)
              );
            }
 
-           const res = await Promise.all([funnelPromise, ...snapshotPromises]);
-           funnelRes = res[0] as any;
-           snapshotRes = res.slice(1);
+           const res = await Promise.all([...funnelPromises, ...snapshotPromises, ...tmaPromises, ...actionsPromises]);
+           
+           let offset = 0;
+           const funnelResponses = res.slice(offset, offset + funnelPromises.length);
+           offset += funnelPromises.length;
+           
+           const snapshotResponses = res.slice(offset, offset + snapshotPromises.length);
+           offset += snapshotPromises.length;
+           
+           const tmaResponses = res.slice(offset, offset + tmaPromises.length);
+           offset += tmaPromises.length;
+           
+           const actionsResponses = res.slice(offset, offset + actionsPromises.length);
+           
+           funnelRes = { 
+             data: funnelResponses.flatMap(r => r.data || []), 
+             error: funnelResponses.find(r => r.error)?.error || null 
+           };
+           snapshotRes = snapshotResponses;
+           
+           tmaData = tmaResponses.flatMap(r => r.data || []);
+           actionsData = actionsResponses.flatMap(r => r.data || []);
         }
-
-        let tmaQuery = supabase.from('view_tma_fila_atendimento').select('*');
-        tmaQuery = applyProjectFilter(tmaQuery);
-        if (filters.broker !== 'Todos') {
-          tmaQuery = (tmaQuery as any).ilike('corretor', `%${filters.broker}%`);
-        }
-        const { data: tmaData, error: tmaError } = await tmaQuery;
-
-        let actionsQuery = supabase.from('view_esforco_corretor').select('*');
-        actionsQuery = applyProjectFilter(actionsQuery);
-        if (filters.broker !== 'Todos') {
-          actionsQuery = (actionsQuery as any).ilike('corretor', `%${filters.broker}%`);
-        }
-        const { data: actionsData, error: actionsError } = await actionsQuery;
 
         const newRawData = {
           leadsData: leadsData || [],
           funnelRes,
           snapshotRes,
-          tmaData: (!tmaError && tmaData) ? tmaData : [],
-          actionsData: (!actionsError && actionsData) ? actionsData : []
+          tmaData,
+          actionsData
         };
 
         setRawData(newRawData);
@@ -234,6 +262,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
       } catch (err: any) {
         console.error('Error fetching dashboard data:', err);
         setError(err.message || 'Erro ao carregar dados do dashboard');
+        setRawData(null);
       } finally {
         setLoading(false);
       }
@@ -307,8 +336,17 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
       if (lead.lead_data_cad) {
         const dateObj = new Date(lead.lead_data_cad.includes('T') ? lead.lead_data_cad : `${lead.lead_data_cad}T12:00:00Z`);
-        const sortKey = dateObj.toISOString().split('T')[0];
-        const displayDate = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+        
+        let monthStr = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+        if (monthStr !== 'Data Inválida' && monthStr !== 'Invalid Date' && !isNaN(dateObj.getTime())) {
+          monthStr = monthStr.replace(' de ', ' ');
+          monthStr = monthStr.charAt(0).toUpperCase() + monthStr.slice(1);
+        } else {
+          monthStr = "Data Inválida";
+        }
+        
+        const sortKey = dateObj.toISOString().substring(0, 7); // yyyy-mm
+        const displayDate = monthStr;
         const emp = lead.empreendimento || 'Outros';
         
         if (!lineDataMap[sortKey]) {
