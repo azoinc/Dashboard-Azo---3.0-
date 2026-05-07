@@ -33,13 +33,17 @@ export const siengeService = {
   async getEstoque(enterpriseId: number) {
     if (!SIENGE_SUBDOMAIN) return { total: 0, disponiveis: 0, vgvEstoque: 0 };
     try {
-      const response = await fetch(`${getBaseUrl()}/enterprises/${enterpriseId}/units?status=DISPONIVEL`, { headers: getHeaders() });
+      const response = await fetch(`${getBaseUrl()}/enterprises/${enterpriseId}/units`, { headers: getHeaders() });
       if (!response.ok) throw new Error('Erro ao buscar unidades');
       const data = await response.json();
       
-      const disponiveis = data.results?.length || 0;
-      const vgvEstoque = data.results?.reduce((acc: number, curr: any) => acc + (curr.basePrice || curr.price || curr.salePrice || curr.suggestedPrice || curr.contractValue || 0), 0) || 0;
+      console.log(`Unidades Sienge API Response for ${enterpriseId}:`, data.results && data.results[0]);
       
+      const disponiveisUnits = data.results?.filter((u: any) => u.status === 'DISPONIVEL' || u.status === 'DISPONIBILIZADA' || u.status === 'AVAILABLE' || String(u.status).toUpperCase().includes('DISP')) || [];
+      const disponiveis = disponiveisUnits.length || 0;
+      const vgvEstoque = disponiveisUnits.reduce((acc: number, curr: any) => acc + (curr.basePrice || curr.price || curr.salePrice || curr.suggestedPrice || curr.contractValue || curr.value || curr.cubPrice || curr.appraisalValue || 0), 0) || 0;
+      
+      console.log(`Enterprise ${enterpriseId} disponiveis:`, disponiveis, 'vgvEstoque:', vgvEstoque);
       return {
         total: data.metadata?.total || 0,
         disponiveis,
