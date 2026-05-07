@@ -12,6 +12,7 @@ import {
 import { useExpense } from "../context/ExpenseContext";
 import { SaleRecord } from "../types";
 import { SalesGoalModal } from "./SalesGoalModal";
+import { useSiengeIntegration } from '../hooks/useSiengeIntegration';
 
 interface ProjectRealized {
   q1: { vendas: number; vgvRealizado: number };
@@ -108,6 +109,8 @@ export const AnnualOverview = () => {
     salesGoals,
     setSalesGoals
   } = useExpense();
+
+  const siengeData = useSiengeIntegration('', '');
 
   const { combinedSP, combinedRJ, totalSP, totalRJ, totalGeral } =
     useMemo(() => {
@@ -349,7 +352,7 @@ export const AnnualOverview = () => {
   return (
     <div className="space-y-6 mb-8">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex items-start space-x-4">
           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
             <Target size={24} />
@@ -363,6 +366,23 @@ export const AnnualOverview = () => {
             </h4>
             <p className="text-xs text-slate-400 mt-1">
               {totalGeral.target.unid} unidades no total
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex items-start space-x-4">
+          <div className="p-3 bg-slate-50 text-slate-600 rounded-xl">
+            <Building2 size={24} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-slate-500">
+              VGV em Estoque
+            </p>
+            <h4 className="text-[0.9rem] font-bold text-slate-800 mt-1">
+              {formatCurrency(siengeData?.vgvEstoque || 0)}
+            </h4>
+            <p className="text-xs text-slate-400 mt-1">
+              Sienge API
             </p>
           </div>
         </div>
