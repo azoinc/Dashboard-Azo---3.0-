@@ -253,10 +253,16 @@ export default function Dashboard() {
       </header>
 
       {/* Top KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <div className="bg-[#61072E] rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center">
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">VGV do Produto</p>
           <p className="text-[0.8rem] font-bold">{formatCurrency(totalVgvProduto)}</p>
+        </div>
+        <div className="bg-[#61072E] rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center">
+          <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">VGV em Estoque</p>
+          <p className="text-[0.8rem] font-bold">
+            {formatCurrency(siengeData?.vgvEstoque || 0)}
+          </p>
         </div>
         <div className="bg-[#61072E] rounded-2xl p-4 shadow-sm text-white flex flex-col justify-center items-center text-center relative">
           <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">VGV Realizado</p>
