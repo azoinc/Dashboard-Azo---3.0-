@@ -31,18 +31,23 @@ export const siengeService = {
 
   // 2. Buscar Estoque (Unidades Disponíveis)
   async getEstoque(enterpriseId: number) {
-    if (!SIENGE_SUBDOMAIN) return { total: 0, disponiveis: 0 };
+    if (!SIENGE_SUBDOMAIN) return { total: 0, disponiveis: 0, vgvEstoque: 0 };
     try {
       const response = await fetch(`${getBaseUrl()}/enterprises/${enterpriseId}/units?status=DISPONIVEL`, { headers: getHeaders() });
       if (!response.ok) throw new Error('Erro ao buscar unidades');
       const data = await response.json();
+      
+      const disponiveis = data.results?.length || 0;
+      const vgvEstoque = data.results?.reduce((acc: number, curr: any) => acc + (curr.basePrice || curr.price || curr.salePrice || curr.suggestedPrice || curr.contractValue || 0), 0) || 0;
+      
       return {
         total: data.metadata?.total || 0,
-        disponiveis: data.results?.length || 0
+        disponiveis,
+        vgvEstoque
       };
     } catch (error) {
       console.error('Sienge API Error:', error);
-      return { total: 0, disponiveis: 0 };
+      return { total: 0, disponiveis: 0, vgvEstoque: 0 };
     }
   },
 
