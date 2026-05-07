@@ -241,11 +241,26 @@ export default function InternoDashboard({ onBack }: Props) {
   const displayLineData = lineData;
   const displayLineChartKeys = lineChartKeys;
   
-  const displayTotalLeads = totalLeads.toLocaleString('pt-BR');
-  const displayVisitaCount = hottestStatusData.visita;
-  const displayAgendamentoCount = hottestStatusData.agendamento;
-  const displayPropostaCount = hottestStatusData.proposta;
-  const displayVendaCount = hottestStatusData.venda;
+  const displayTotalLeadsNum = totalLeads;
+  const displayTotalLeads = displayTotalLeadsNum.toLocaleString('pt-BR');
+  
+  const displayDescartadosCountNum = hottestStatusData.descartado || 0;
+  const displayDescartadosCount = displayDescartadosCountNum.toLocaleString('pt-BR');
+  
+  const displayAgendamentoCountNum = hottestStatusData.agendamento;
+  const displayAgendamentoCount = displayAgendamentoCountNum.toLocaleString('pt-BR');
+  
+  const displayVisitaCountNum = hottestStatusData.visita;
+  const displayVisitaCount = displayVisitaCountNum.toLocaleString('pt-BR');
+  
+  const displayVendaCountNum = hottestStatusData.venda;
+  const displayVendaCount = displayVendaCountNum.toLocaleString('pt-BR');
+
+  const kpiQualificados = displayTotalLeadsNum - displayDescartadosCountNum;
+  const pctDescartes = displayTotalLeadsNum > 0 ? ((displayDescartadosCountNum / displayTotalLeadsNum) * 100).toFixed(1) : '0';
+  const pctAgendamentos = kpiQualificados > 0 ? ((displayAgendamentoCountNum / kpiQualificados) * 100).toFixed(1) : '0';
+  const pctVisitas = displayAgendamentoCountNum > 0 ? ((displayVisitaCountNum / displayAgendamentoCountNum) * 100).toFixed(1) : '0';
+  const pctVendas = displayVisitaCountNum > 0 ? ((displayVendaCountNum / displayVisitaCountNum) * 100).toFixed(1) : '0';
 
   const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#eab308', '#ec4899', '#f43f5e', '#84cc16'];
 
@@ -398,22 +413,37 @@ export default function InternoDashboard({ onBack }: Props) {
               <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
                 <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Leads Totais</p>
                 <p className="text-3xl font-bold text-white">{displayTotalLeads}</p>
+                <p className="mt-2 text-[10px] text-white/50 bg-black/20 px-2 py-1 rounded-full whitespace-nowrap">
+                  Ref: <strong className="text-white">100%</strong> • Real: <strong className="text-white">100%</strong>
+                </p>
+              </div>
+              <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
+                <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Descartados</p>
+                <p className="text-3xl font-bold text-white">{displayDescartadosCount}</p>
+                <p className="mt-2 text-[10px] text-white/50 bg-black/20 px-2 py-1 rounded-full whitespace-nowrap">
+                  Ref: <strong className="text-white">70%</strong> • Real: <strong className="text-white">{pctDescartes}%</strong>
+                </p>
               </div>
               <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
                 <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Agendamentos</p>
                 <p className="text-3xl font-bold text-white">{displayAgendamentoCount}</p>
+                <p className="mt-2 text-[10px] text-white/50 bg-black/20 px-2 py-1 rounded-full whitespace-nowrap" title="Calculado sobre leads qualificados">
+                  Ref: <strong className="text-white">25%</strong> • Real: <strong className="text-white">{pctAgendamentos}%</strong>
+                </p>
               </div>
               <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
                 <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Visitas</p>
                 <p className="text-3xl font-bold text-white">{displayVisitaCount}</p>
-              </div>
-              <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
-                <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Propostas</p>
-                <p className="text-3xl font-bold text-white">{displayPropostaCount}</p>
+                <p className="mt-2 text-[10px] text-white/50 bg-black/20 px-2 py-1 rounded-full whitespace-nowrap" title="Calculado sobre agendamentos">
+                  Ref: <strong className="text-white">35%</strong> • Real: <strong className="text-white">{pctVisitas}%</strong>
+                </p>
               </div>
               <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
                 <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Vendas Realizadas</p>
                 <p className="text-3xl font-bold text-white">{displayVendaCount}</p>
+                <p className="mt-2 text-[10px] text-white/50 bg-black/20 px-2 py-1 rounded-full whitespace-nowrap" title="Calculado sobre visitas">
+                  Ref: <strong className="text-white">1%</strong> • Real: <strong className="text-white">{pctVendas}%</strong>
+                </p>
               </div>
             </div>
 
