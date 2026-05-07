@@ -408,17 +408,39 @@ export function useInternoDashboard(filters: DashboardFilters) {
     const totalStage = funnelData.find((item: any) => item.name.includes('Total de Leads'));
     const totalLeads = totalStage ? totalStage.value : leadsData.length;
 
+    const leadOriginMap = new Map<string, string>();
+    let descartadosCount = 0;
+    leadsData.forEach(l => {
+      leadOriginMap.set(l.id, (l.origem || '').toLowerCase());
+      if (l.status_atual?.toLowerCase().includes('descartad')) {
+         descartadosCount++;
+      }
+    });
+
+    const isAllowedVendaOrigin = (o: string) => {
+      return o.includes('facebook') || o.includes('fb') || o.includes('meta') ||
+             o.includes('insta') || o.includes('ig') || 
+             o.includes('site') || o.includes('orgânico') || o.includes('organico') || o.includes('seo') ||
+             o.includes('whatsapp') || o.includes('whats') || o.includes('wpp');
+    };
+
     let rCount = 0;
     let pCount = 0;
     let vCount = 0;
     let aCount = 0;
-    leadHottestStatus.forEach(score => {
-      if (score >= 4) rCount++;
+    leadHottestStatus.forEach((score, leadId) => {
+      if (score >= 4) {
+        const origin = leadOriginMap.get(leadId) || '';
+        if (isAllowedVendaOrigin(origin)) {
+           rCount++;
+        }
+      }
       if (score >= 3) pCount++;
       if (score >= 2) vCount++;
       if (score >= 1) aCount++;
     });
-    const hottestStatusData = { visita: vCount, agendamento: aCount, proposta: pCount, venda: rCount };
+    const hottestStatusData = { visita: vCount, agendamento: aCount, proposta: pCount, venda: rCount, descartado: descartadosCount };
+
 
     // Snapshots Processing
     const snapshotDataAll = rawData.snapshotRes.flatMap((res: any) => res.data || []);
