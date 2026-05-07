@@ -338,17 +338,21 @@ export function useInternoDashboard(filters: DashboardFilters) {
       brokerCounts[corretor] = (brokerCounts[corretor] || 0) + 1;
 
       if (lead.lead_data_cad) {
-        const dateObj = new Date(lead.lead_data_cad.includes('T') ? lead.lead_data_cad : `${lead.lead_data_cad}T12:00:00Z`);
-        
-        let monthStr = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-        if (monthStr !== 'Data Inválida' && monthStr !== 'Invalid Date' && !isNaN(dateObj.getTime())) {
-          monthStr = monthStr.replace(' de ', ' ');
-          monthStr = monthStr.charAt(0).toUpperCase() + monthStr.slice(1);
-        } else {
-          monthStr = "Data Inválida";
+        let monthStr = lead.lead_data_cad;
+        let sortKey = monthStr;
+        if (typeof monthStr === 'string' && monthStr.length >= 7) {
+          const parts = monthStr.substring(0, 10).split('-');
+          if (parts.length >= 2) {
+             const year = parts[0];
+             const monthNum = parseInt(parts[1], 10);
+             const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+             if (monthNum >= 1 && monthNum <= 12) {
+                 monthStr = `${monthNames[monthNum - 1]} ${year}`;
+                 sortKey = `${year}-${String(monthNum).padStart(2, '0')}`;
+             }
+          }
         }
         
-        const sortKey = dateObj.toISOString().substring(0, 7); // yyyy-mm
         const displayDate = monthStr;
         const emp = lead.empreendimento || 'Outros';
         
@@ -464,14 +468,17 @@ export function useInternoDashboard(filters: DashboardFilters) {
       const compData = row.competencia_data;
       if (!compData) return;
       
-      const dateStr = compData.length === 7 ? `${compData}-01T12:00:00Z` : `${compData}T12:00:00Z`;
-      const dateObj = new Date(dateStr);
-      let monthStr = dateObj.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
-      if (monthStr === 'Data Inválida' || monthStr === 'Invalid Date' || isNaN(dateObj.getTime())) {
-          monthStr = compData;
-      } else {
-          monthStr = monthStr.replace('.', '').replace(' de ', ' ');
-          monthStr = monthStr.charAt(0).toUpperCase() + monthStr.slice(1);
+      let monthStr = compData;
+      if (typeof compData === 'string' && compData.length >= 7) {
+        const parts = compData.substring(0, 10).split('-');
+        if (parts.length >= 2) {
+           const year = parts[0];
+           const monthNum = parseInt(parts[1], 10);
+           const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+           if (monthNum >= 1 && monthNum <= 12) {
+               monthStr = `${monthNames[monthNum - 1]} ${year}`;
+           }
+        }
       }
       
       if (activeFilter.month && monthStr !== activeFilter.month) return; // INTERACTIVE MONTH FILTER
