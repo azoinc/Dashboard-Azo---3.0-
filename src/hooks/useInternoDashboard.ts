@@ -75,7 +75,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
         let endDate = new Date();
 
         if (filters.period === 'Todo o período') {
-          startDate = new Date(2023, 0, 1);
+          startDate = new Date(2026, 0, 1);
         } else if (filters.period === 'Últimos 30 dias') {
           startDate.setDate(now.getDate() - 30);
         } else if (filters.period === 'Este mês' || filters.period === 'Mês Atual') {
@@ -89,6 +89,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
         } else {
           startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         }
+
+        const globalMinDate = new Date(2026, 0, 1);
+        if (startDate < globalMinDate) startDate = globalMinDate;
 
         const formatYYYYMMDDEnd = (date: Date) => {
           const y = date.getFullYear();
@@ -383,6 +386,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
         
         const etapa = row.etapa_visual;
         if (etapa && leadId) {
+          if (etapa.toLowerCase().includes('ação') || etapa.toLowerCase().includes('acao')) return;
+
           if (!funnelCounts[etapa]) funnelCounts[etapa] = new Set();
           funnelCounts[etapa].add(leadId);
 
@@ -461,11 +466,11 @@ export function useInternoDashboard(filters: DashboardFilters) {
       
       const dateStr = compData.length === 7 ? `${compData}-01T12:00:00Z` : `${compData}T12:00:00Z`;
       const dateObj = new Date(dateStr);
-      let monthStr = dateObj.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      let monthStr = dateObj.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
       if (monthStr === 'Data Inválida' || monthStr === 'Invalid Date' || isNaN(dateObj.getTime())) {
           monthStr = compData;
       } else {
-          monthStr = monthStr.replace(' de ', ' ');
+          monthStr = monthStr.replace('.', '').replace(' de ', ' ');
           monthStr = monthStr.charAt(0).toUpperCase() + monthStr.slice(1);
       }
       
