@@ -136,10 +136,10 @@ const generateCompetenceOptions = () => {
   const options = [{ label: 'Atual (Tempo Real)', value: 'Atual' }];
   const date = new Date();
   date.setDate(1); // Set to 1st of month
-  for (let i = 0; i < 12; i++) {
+  while (date.getFullYear() > 2026 || (date.getFullYear() === 2026 && date.getMonth() >= 0)) {
     const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
-    const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-    options.push({ label: label.charAt(0).toUpperCase() + label.slice(1), value });
+    const labelStr = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    options.push({ label: labelStr.charAt(0).toUpperCase() + labelStr.slice(1), value });
     date.setMonth(date.getMonth() - 1);
   }
   return options;
@@ -247,6 +247,9 @@ export default function InternoDashboard({ onBack }: Props) {
   const displayDescartadosCountNum = hottestStatusData.descartado || 0;
   const displayDescartadosCount = displayDescartadosCountNum.toLocaleString('pt-BR');
   
+  const displayEmAtendimentoNum = displayTotalLeadsNum - displayDescartadosCountNum;
+  const displayEmAtendimento = displayEmAtendimentoNum.toLocaleString('pt-BR');
+  
   const displayAgendamentoCountNum = hottestStatusData.agendamento;
   const displayAgendamentoCount = displayAgendamentoCountNum.toLocaleString('pt-BR');
   
@@ -258,6 +261,7 @@ export default function InternoDashboard({ onBack }: Props) {
 
   const kpiQualificados = displayTotalLeadsNum - displayDescartadosCountNum;
   const pctDescartes = displayTotalLeadsNum > 0 ? ((displayDescartadosCountNum / displayTotalLeadsNum) * 100).toFixed(1) : '0';
+  const pctEmAtendimento = displayTotalLeadsNum > 0 ? ((displayEmAtendimentoNum / displayTotalLeadsNum) * 100).toFixed(1) : '0';
   const pctAgendamentos = kpiQualificados > 0 ? ((displayAgendamentoCountNum / kpiQualificados) * 100).toFixed(1) : '0';
   const pctVisitas = displayAgendamentoCountNum > 0 ? ((displayVisitaCountNum / displayAgendamentoCountNum) * 100).toFixed(1) : '0';
   const pctVendas = displayVisitaCountNum > 0 ? ((displayVendaCountNum / displayVisitaCountNum) * 100).toFixed(1) : '0';
@@ -409,7 +413,7 @@ export default function InternoDashboard({ onBack }: Props) {
         {activeTab === 'gerais' && (
           <div className="space-y-6 max-w-7xl mx-auto">
             {/* Top Row: Big Numbers */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
                 <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Leads Totais</p>
                 <p className="text-3xl font-bold text-white">{displayTotalLeads}</p>
@@ -422,6 +426,13 @@ export default function InternoDashboard({ onBack }: Props) {
                 <p className="text-3xl font-bold text-white">{displayDescartadosCount}</p>
                 <p className="mt-2 text-[10px] text-white/50 bg-black/20 px-2 py-1 rounded-full whitespace-nowrap">
                   Ref: <strong className="text-white">70%</strong> • Real: <strong className="text-white">{pctDescartes}%</strong>
+                </p>
+              </div>
+              <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
+                <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Em Atendimento</p>
+                <p className="text-3xl font-bold text-white">{displayEmAtendimento}</p>
+                <p className="mt-2 text-[10px] text-white/50 bg-black/20 px-2 py-1 rounded-full whitespace-nowrap" title="Calculado sobre leads totais">
+                  Ref: <strong className="text-white">30%</strong> • Real: <strong className="text-white">{pctEmAtendimento}%</strong>
                 </p>
               </div>
               <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
@@ -570,6 +581,12 @@ export default function InternoDashboard({ onBack }: Props) {
               </div>
             </div>
 
+            {/* Brokers Row moved to Corretores tab */}
+          </div>
+        )}
+
+        {activeTab === 'corretores' && (
+          <div className="space-y-6 max-w-7xl mx-auto">
             {/* Brokers Row */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               <div className="lg:col-span-3 bg-white p-6 rounded-xl border border-slate-200">
@@ -607,11 +624,7 @@ export default function InternoDashboard({ onBack }: Props) {
                 </div>
               </div>
             </div>
-          </div>
-        )}
 
-        {activeTab === 'corretores' && (
-          <div className="space-y-6 max-w-7xl mx-auto">
             <div className="bg-white p-6 rounded-xl border border-slate-200">
               <h3 className="text-sm font-medium text-slate-500 mb-4">Tempo Médio de Recepção do Lead (Horas)</h3>
               <div className="h-96">
