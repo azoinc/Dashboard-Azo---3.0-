@@ -201,12 +201,24 @@ export function useInternoDashboard(filters: DashboardFilters) {
           })[0];
         };
 
+        let excludedByMarketingCount = 0;
+
         for (const [lid, history] of milestonesByLead.entries()) {
+          // CRITICAL: Check if this lead EVER had a marketing status in its history
+          const hasMarketingHistory = history.some(item => {
+            const st = String(item.status || item.para_nome || '').toLowerCase();
+            // Match "ação de marketing", "acao de marketing", or simply contains "marketing"
+            return st.includes('marketing') || st.includes('ação de marketing') || st.includes('acao de marketing');
+          });
+
+          if (hasMarketingHistory) {
+            excludedByMarketingCount++;
+            continue; // Completely exclude this lead from metrics
+          }
+
           const latest = getLatestMilestone(history);
           if (!latest) continue;
 
-          // We show all leads that passed the registration date filter
-          // Filter 'Ação de Marketing' specifically in the charts later
           leadsData.push({
             status_atual: latest.status || latest.para_nome || 'Sem Status',
             id: lid,
@@ -224,7 +236,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
           
           history.forEach(item => {
              const st = (item.status || item.para_nome || '').toLowerCase();
-             if (st.includes('ação de marketing') || st.includes('acao de marketing')) return;
+             // (Historical marketing exclusion is already handled above for the whole lead)
 
              if (!st.includes('aguardando')) reachedStages.add('2. Em Atendimento');
              if (st.match(/agendam|agendado|visita|proposta|negocia|venda/)) reachedStages.add('3. Agendamento');
@@ -238,7 +250,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
           });
         }
 
-        console.log(`[Dashboard] Final population: ${leadsData.length} unique leads`);
+        console.log(`[Dashboard] Final population: ${leadsData.length} unique leads (Excluded ${excludedByMarketingCount} leads with marketing history)`);
 
 
         let funnelRes = { data: [] as any[], error: null };
