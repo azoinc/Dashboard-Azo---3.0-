@@ -109,11 +109,10 @@ export function useInternoDashboard(filters: DashboardFilters) {
         const startDateStrFull = formatYYYYMMDDStart(startDate);
         const endDateStrFull = formatYYYYMMDDEnd(endDate);
 
-        // More robust date strings for different backend column types
+        // Determine Registration Date Bounds
         const startDateSimple = startDateStrFull.split('T')[0];
         const endDateSimple = endDateStrFull.split('T')[0];
         const endDateInclusive = endDateSimple + ' 23:59:59';
-
         const isTodoPeriodo = filters.period === 'Todo o período';
 
         const applyProjectFilter = (query: any) => {
@@ -128,180 +127,85 @@ export function useInternoDashboard(filters: DashboardFilters) {
           return query;
         };
 
-        let leadsData: any[] | null = [];
-        let syntheticFunnelData: any[] = [];
-        
         const hasSpecificCompetences = filters.competences && filters.competences.length > 0 && !filters.competences.includes('Atual');
-        let rawSnapshotData: any[] = [];
-        let rawLeadsData: any[] = [];
+
+        // PHASE 1: Get the population of leads based on lead_milestones
+        let milestonesQuery = supabase
+          .from('lead_milestones')
+          .select('lead_id, lead_nome, status, para_nome, lead_data_cad, origem, corretor, empreendimento, motivo_cancelamento, referencia_data, hora_referencia_data')
+          .limit(40000);
+
+        // Apply filters directly to milestones
+        if (!isTodoPeriodo) {
+          milestonesQuery = (milestonesQuery as any)
+            .gte('lead_data_cad', startDateSimple)
+            .lte('lead_data_cad', endDateInclusive);
+        }
 
         if (hasSpecificCompetences) {
-          // Find min and max dates across selected competences
           const dates = (filters.competences || []).map(c => new Date(c + "T00:00:00Z"));
           const compStartDate = new Date(Math.min(...dates.map(d => d.getTime())));
           const compEndDate = new Date(Math.max(...dates.map(d => d.getTime())));
           compEndDate.setMonth(compEndDate.getMonth() + 1);
-          compEndDate.setDate(0); // Last day of the month
+          compEndDate.setDate(0); 
 
-          const compStartStr = compStartDate.toISOString().split('T')[0];
-          const compEndStr = compEndDate.toISOString().split('T')[0];
-          
-          let snapshotQuery = supabase
-            .from('lead_milestones')
-            .select('lead_id, lead_nome, status, para_nome, lead_data_cad, origem, corretor, empreendimento, motivo_cancelamento, referencia_data, hora_referencia_data')
-            .gte('referencia_data', compStartStr)
-            .lte('referencia_data', compEndStr)
-            .limit(30000); 
-            
-          // The primary date period selector validates the create date of the lead
-          if (!isTodoPeriodo) {
-            snapshotQuery = (snapshotQuery as any).gte('lead_data_cad', startDateSimple).lte('lead_data_cad', endDateInclusive);
-          }
-          
-          snapshotQuery = applyProjectFilter(snapshotQuery);
-          if (filters.broker !== 'Todos') {
-            snapshotQuery = (snapshotQuery as any).ilike('corretor', `%${filters.broker}%`);
-          }
-
-          const { data, error } = await snapshotQuery;
-          if (error) throw error;
-          if (data) rawSnapshotData = data;
-        } else {
-          let leadsQuery = supabase
-            .from('leads')
-            .select('status_atual, nome, id_cv, data_criacao_cv, origem, motivo_cancelamento, corretor, empreendimento')
-            .gte('data_criacao_cv', startDateSimple)
-            .lte('data_criacao_cv', endDateInclusive)
-            .limit(10000);
-
-          leadsQuery = applyProjectFilter(leadsQuery);
-          if (filters.broker !== 'Todos') {
-            leadsQuery = (leadsQuery as any).ilike('corretor', `%${filters.broker}%`);
-          }
-
-          const { data, error } = await leadsQuery;
-          if (error) throw error;
-          if (data) rawLeadsData = data;
+          milestonesQuery = (milestonesQuery as any)
+            .gte('referencia_data', compStartDate.toISOString().split('T')[0])
+            .lte('referencia_data', compEndDate.toISOString().split('T')[0]);
         }
 
-        // --- Gather all candidate IDs to fetch exclusions ---
-        const candidateLeadIds = Array.from(new Set([
-          ...rawSnapshotData.map((r: any) => String(r.lead_id)),
-          ...rawLeadsData.map((r: any) => String(r.id_cv))
-        ])).filter(id => id != null && id !== 'undefined' && id !== 'null');
-
-        const excludedLeadIds = new Set<string>();
-
-        if (candidateLeadIds.length > 0) {
-          const chunkSize = 1000;
-          const exclusionPromises = [];
-          for (let i = 0; i < candidateLeadIds.length; i += chunkSize) {
-             const chunk = candidateLeadIds.slice(i, i + chunkSize);
-             
-             // Optimized exclusion query: matching specific strings to avoid filtering valid leads like 'Ligação' or 'Negociação'
-             exclusionPromises.push(
-               supabase
-                 .from('lead_milestones')
-                 .select('lead_id')
-                 .or('para_nome.ilike.%Ação de Marketing%,status.ilike.%Ação de Marketing%')
-                 .in('lead_id', chunk)
-             );
-             exclusionPromises.push(
-               supabase
-                 .from('leads')
-                 .select('id_cv')
-                 .or('status_atual.ilike.%Ação de Marketing%,motivo_cancelamento.ilike.%Ação de Marketing%,origem.ilike.%Ação de Marketing%')
-                 .in('id_cv', chunk)
-             );
-          }
-          const exclusionRes = await Promise.all(exclusionPromises);
-          exclusionRes.forEach(res => {
-            if (res.error) {
-              console.error('Exclusion query error:', res.error);
-            }
-            if (res.data) {
-              res.data.forEach((r: any) => {
-                const id = String(r.lead_id || r.id_cv);
-                if (id && id !== 'undefined' && id !== 'null') {
-                  excludedLeadIds.add(id);
-                }
-              });
-            }
-          });
+        milestonesQuery = applyProjectFilter(milestonesQuery);
+        if (filters.broker !== 'Todos') {
+          milestonesQuery = (milestonesQuery as any).ilike('corretor', `%${filters.broker}%`);
         }
 
-        // --- Now process and filter the data ---
-        if (hasSpecificCompetences) {
-           const selectedMonthStrings = (filters.competences || []).map(c => c.substring(0, 7)); // YYYY-MM
-           
-           const sortedData = rawSnapshotData.sort((a: any, b: any) => {
-             if (a.referencia_data !== b.referencia_data) {
-               return (a.referencia_data > b.referencia_data) ? -1 : 1;
-             }
-             const horaA = a.hora_referencia_data || '00:00:00';
-             const horaB = b.hora_referencia_data || '00:00:00';
-             return (horaA > horaB) ? -1 : 1;
-           });
+        const { data: milestonesData, error: milestonesError } = await milestonesQuery;
+        if (milestonesError) throw milestonesError;
 
-           const seenLeads = new Set();
-           const deduplicated = [];
-           for (const item of sortedData) {
-             const itemMonth = item.referencia_data.substring(0, 7);
-             if (!selectedMonthStrings.includes(itemMonth)) continue;
-             
-             const stringLeadId = String(item.lead_id);
-             
-             if (!seenLeads.has(stringLeadId)) {
-               seenLeads.add(stringLeadId);
-               
-               if (excludedLeadIds.has(stringLeadId)) continue;
+        // PHASE 2: Deduplicate and build leads population
+        const rawDataFromMilestones = milestonesData || [];
+        
+        // Sort to ensure we get a consistent view of the latest state if needed
+        const sortedMilestones = [...rawDataFromMilestones].sort((a, b) => {
+          if (a.referencia_data !== b.referencia_data) return b.referencia_data.localeCompare(a.referencia_data);
+          return (b.hora_referencia_data || '').localeCompare(a.hora_referencia_data || '');
+        });
 
-               const stAtual = item.status || item.para_nome || '';
-               const st = String(stAtual).toLowerCase();
-               if (st === 'ação de marketing' || st === 'acao de marketing') continue; 
+        const seenLeads = new Set();
+        const leadsData: any[] = [];
+        const syntheticFunnelData: any[] = [];
 
-               deduplicated.push({
-                 status_atual: stAtual,
-                 id: stringLeadId,
-                 nome: item.lead_nome,
-                 lead_data_cad: item.lead_data_cad,
-                 origem: item.origem,
-                 motivo_cancelamento: item.motivo_cancelamento || null,
-                 corretor: item.corretor,
-                 empreendimento: item.empreendimento
-               });
-               
-               syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '1. Total de Leads' });
-               
-               if (!st.includes('aguardando')) {
-                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '2. Em Atendimento' });
-               }
-               if (st.includes('agendam') || st.includes('agendado') || st.includes('visita') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
-                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '3. Agendamento' });
-               }
-               if (st.includes('visita') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
-                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '4. Visita' });
-               }
-               if (st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
-                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '5. Proposta/Negociação' });
-               }
-               if (st.includes('venda') || st.includes('contrato')) {
-                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '6. Vendas' });
-               }
-             }
-           }
-           leadsData = deduplicated;
-        } else {
-           leadsData = rawLeadsData.filter((item: any) => !excludedLeadIds.has(String(item.id_cv))).map((item: any) => ({
-             status_atual: item.status_atual,
-             id: String(item.id_cv),
-             nome: item.nome,
-             lead_data_cad: item.data_criacao_cv,
-             origem: item.origem,
-             motivo_cancelamento: item.motivo_cancelamento,
-             corretor: item.corretor,
-             empreendimento: item.empreendimento
-           }));
+        for (const item of sortedMilestones) {
+          const lid = String(item.lead_id);
+          if (!lid || lid === 'null' || lid === 'undefined') continue;
+
+          // Exclusion rules based on keywords (as implied by previous turns but simplified)
+          const statusLower = String(item.status || item.para_nome || '').toLowerCase();
+          const origemLower = String(item.origem || '').toLowerCase();
+          if (statusLower.includes('ação de marketing') || statusLower.includes('acao de marketing') || origemLower.includes('ação de marketing')) continue;
+
+          if (!seenLeads.has(lid)) {
+             seenLeads.add(lid);
+             leadsData.push({
+               status_atual: item.status || item.para_nome || 'Sem Status',
+               id: lid,
+               nome: item.lead_nome,
+               lead_data_cad: item.lead_data_cad,
+               origem: item.origem,
+               motivo_cancelamento: item.motivo_cancelamento,
+               corretor: item.corretor,
+               empreendimento: item.empreendimento
+             });
+          }
+
+          // Historical Funnel logic from milestones
+          const st = statusLower;
+          syntheticFunnelData.push({ lead_id: lid, etapa_visual: '1. Total de Leads' });
+          if (!st.includes('aguardando')) syntheticFunnelData.push({ lead_id: lid, etapa_visual: '2. Em Atendimento' });
+          if (st.match(/agendam|agendado|visita|proposta|negocia|venda|contrato/)) syntheticFunnelData.push({ lead_id: lid, etapa_visual: '3. Agendamento' });
+          if (st.match(/visita|proposta|negocia|venda|contrato/)) syntheticFunnelData.push({ lead_id: lid, etapa_visual: '4. Visita' });
+          if (st.match(/proposta|negocia|venda|contrato/)) syntheticFunnelData.push({ lead_id: lid, etapa_visual: '5. Proposta/Negociação' });
+          if (st.match(/venda|contrato/)) syntheticFunnelData.push({ lead_id: lid, etapa_visual: '6. Vendas' });
         }
 
         let funnelRes = { data: [] as any[], error: null };
@@ -309,77 +213,41 @@ export function useInternoDashboard(filters: DashboardFilters) {
         let tmaData: any[] = [];
         let actionsData: any[] = [];
 
-        if (leadsData && leadsData.length > 0) {
+        if (leadsData.length > 0) {
            const leadIds = leadsData.map(l => l.id);
-           const chunkSize = 1000;
-           const snapshotPromises = [];
-           const funnelPromises = [];
-           const tmaPromises = [];
-           const actionsPromises = [];
+           const chunkSize = 500;
+           const promises: Promise<any>[] = [];
 
            for (let i = 0; i < leadIds.length; i += chunkSize) {
              const chunk = leadIds.slice(i, i + chunkSize);
              
-             snapshotPromises.push(
-               supabase
-                 .from('view_lead_snapshot_mensal')
-                 .select('status_final_mes, competencia_data, lead_id')
-                 .in('lead_id', chunk)
-             );
+             if (!hasSpecificCompetences) {
+               promises.push(supabase.from('view_funil_maximo_com_total').select('etapa_visual, lead_id').in('lead_id', chunk) as any);
+             }
              
-             funnelPromises.push(
-               supabase
-                 .from('view_funil_maximo_com_total')
-                 .select('etapa_visual, lead_id')
-                 .in('lead_id', chunk)
-             );
-             
-             tmaPromises.push(
-               supabase
-                 .from('view_tma_fila_atendimento')
-                 .select('corretor, segundos_espera')
-                 .in('lead_id', chunk)
-             );
-             
-             actionsPromises.push(
-               supabase
-                 .from('view_esforco_corretor')
-                 .select('corretor, lead_id')
-                 .in('lead_id', chunk)
-             );
+             promises.push(supabase.from('view_lead_snapshot_mensal').select('status_final_mes, competencia_data, lead_id').in('lead_id', chunk) as any);
+             promises.push(supabase.from('view_tma_fila_atendimento').select('corretor, segundos_espera').in('lead_id', chunk) as any);
+             promises.push(supabase.from('view_esforco_corretor').select('corretor, lead_id').in('lead_id', chunk) as any);
            }
 
-           const res = await Promise.all([...funnelPromises, ...snapshotPromises, ...tmaPromises, ...actionsPromises]);
-           
-           let offset = 0;
-           const funnelResponses = res.slice(offset, offset + funnelPromises.length);
-           offset += funnelPromises.length;
-           
-           const snapshotResponses = res.slice(offset, offset + snapshotPromises.length);
-           offset += snapshotPromises.length;
-           
-           const tmaResponses = res.slice(offset, offset + tmaPromises.length);
-           offset += tmaPromises.length;
-           
-           const actionsResponses = res.slice(offset, offset + actionsPromises.length);
+           const resultsList = await Promise.all(promises);
            
            if (hasSpecificCompetences) {
-             funnelRes = {
-               data: syntheticFunnelData,
-               error: null
-             };
+             funnelRes = { data: syntheticFunnelData, error: null };
+             // resultsList: [snapshot, tma, actions, snapshot, tma, actions...] (3 per chunk)
+             snapshotRes = resultsList.filter((_, idx) => (idx % 3 === 0)); 
+             tmaData = resultsList.filter((_, idx) => (idx % 3 === 1)).flatMap(r => r.data || []);
+             actionsData = resultsList.filter((_, idx) => (idx % 3 === 2)).flatMap(r => r.data || []);
            } else {
-             funnelRes = { 
-               data: funnelResponses.flatMap(r => r.data || []), 
-               error: funnelResponses.find(r => r.error)?.error || null 
-             };
+             // resultsList: [funnel, snapshot, tma, actions, ...] (4 per chunk)
+             const step = 4;
+             funnelRes = { data: resultsList.filter((_, idx) => idx % step === 0).flatMap(r => r.data || []), error: null };
+             snapshotRes = resultsList.filter((_, idx) => idx % step === 1);
+             tmaData = resultsList.filter((_, idx) => idx % step === 2).flatMap(r => r.data || []);
+             actionsData = resultsList.filter((_, idx) => idx % step === 3).flatMap(r => r.data || []);
            }
-           
-           snapshotRes = snapshotResponses;
-           
-           tmaData = tmaResponses.flatMap(r => r.data || []);
-           actionsData = actionsResponses.flatMap(r => r.data || []);
         }
+
 
         const newRawData = {
           leadsData: leadsData || [],
