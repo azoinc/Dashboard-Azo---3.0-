@@ -46,7 +46,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
       // We do not clear rawData manually here because we want to see the cached data immediately if available,
       // but if the fetch fails, we should clear it.
 
-      const cacheKey = `dashboardCache_${JSON.stringify({
+      const cacheKey = `dashboardCacheV2_${JSON.stringify({
         period: filters.period,
         project: filters.project,
         broker: filters.broker,
@@ -179,7 +179,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
         const candidateLeadIds = Array.from(new Set([
           ...rawSnapshotData.map((r: any) => r.lead_id),
           ...rawLeadsData.map((r: any) => r.id_cv)
-        ]));
+        ])).filter(id => id != null);
 
         const excludedLeadIds = new Set<string>();
 
@@ -191,24 +191,43 @@ export function useInternoDashboard(filters: DashboardFilters) {
              exclusionPromises.push(
                supabase
                  .from('lead_milestones')
-                 .select('lead_id')
+                 .select('lead_id, para_nome, status')
                  .in('lead_id', chunk)
-                 .or('para_nome.ilike.%acao%,para_nome.ilike.%ação%,status.ilike.%acao%,status.ilike.%ação%')
              );
              exclusionPromises.push(
                supabase
                  .from('leads')
-                 .select('id_cv')
+                 .select('id_cv, status_atual, motivo_cancelamento, origem')
                  .in('id_cv', chunk)
-                 .or('status_atual.ilike.%acao%,status_atual.ilike.%ação%,motivo_cancelamento.ilike.%acao%,motivo_cancelamento.ilike.%ação%,origem.ilike.%acao%,origem.ilike.%ação%')
              );
           }
           const exclusionRes = await Promise.all(exclusionPromises);
           exclusionRes.forEach(res => {
+            if (res.error) {
+              console.error('Exclusion query error:', res.error);
+            }
             if (res.data) {
               res.data.forEach((r: any) => {
-                if (r.lead_id) excludedLeadIds.add(String(r.lead_id));
-                if (r.id_cv) excludedLeadIds.add(String(r.id_cv));
+                let isExcluded = false;
+                const terms = [
+                  String(r.para_nome || '').toLowerCase(),
+                  String(r.status || '').toLowerCase(),
+                  String(r.status_atual || '').toLowerCase(),
+                  String(r.motivo_cancelamento || '').toLowerCase(),
+                  String(r.origem || '').toLowerCase()
+                ];
+                
+                for (const term of terms) {
+                  if (term.includes('ação') || term.includes('acao')) {
+                    isExcluded = true;
+                    break;
+                  }
+                }
+
+                if (isExcluded) {
+                  if (r.lead_id) excludedLeadIds.add(String(r.lead_id));
+                  if (r.id_cv) excludedLeadIds.add(String(r.id_cv));
+                }
               });
             }
           });
