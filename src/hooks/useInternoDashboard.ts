@@ -287,11 +287,13 @@ export function useInternoDashboard(filters: DashboardFilters) {
              
              if (!hasSpecificCompetences) {
                let q = supabase.from('view_funil_maximo_com_total').select('etapa_visual, lead_id').in('lead_id', chunk);
-                              chunkPromises.push(q as any);
+               q = applyProjectFilter(q);
+               chunkPromises.push(q as any);
              }
              
              let sq = supabase.from('view_lead_snapshot_mensal').select('status_final_mes, competencia_data, lead_id').in('lead_id', chunk);
-                          chunkPromises.push(sq as any);
+             sq = applyProjectFilter(sq);
+             chunkPromises.push(sq as any);
 
              // TMA and esforço normally follow the broker but we can add project filter if column exists
              chunkPromises.push(supabase.from('view_tma_fila_atendimento').select('corretor, segundos_espera').in('lead_id', chunk) as any);
@@ -305,7 +307,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
            const resultsList = allResults;
            
            if (hasSpecificCompetences) {
-             funnelRes = { data: syntheticFunnelData, error: null };
+             funnelRes = { data: [], error: null };
              // resultsList: [snapshot, tma, actions, snapshot, tma, actions...] (3 per chunk)
              snapshotRes = resultsList.filter((_, idx) => (idx % 3 === 0)); 
              tmaData = resultsList.filter((_, idx) => (idx % 3 === 1)).flatMap(r => r.data || []);
