@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, ArrowLeft, BarChart3, Users, Megaphone, Filter, ChevronDown, Check } from 'lucide-react';
 import { 
