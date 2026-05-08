@@ -114,7 +114,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
         const applyProjectFilter = (query: any) => {
           if (filters.project && filters.project !== 'Todos') {
-            return (query as any).ilike('empreendimento', `%${filters.project}%`);
+            // For exact matches from the dropdown, .eq is more reliable and indexed
+            return (query as any).eq('empreendimento', filters.project);
           } else if (filters.city && filters.city !== 'ALL' && filters.city) {
              const cityProjects = PROJECTS_BY_CITY[filters.city as keyof typeof PROJECTS_BY_CITY];
              if (cityProjects && cityProjects.length > 0) {
@@ -173,7 +174,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
         });
 
         const leadsData: any[] = [];
-        const syntheticFunnelData: any[] = [];
+        const syntheticFunnelCounts: Record<string, number> = {};
+        const leadHottestScore = new Map<string, number>();
 
         // Sort helper for milestones (Latest first)
         const getLatestMilestone = (list: any[]) => {
@@ -193,13 +195,12 @@ export function useInternoDashboard(filters: DashboardFilters) {
           // CRITICAL: Check if this lead EVER had a marketing status in its history
           const hasMarketingHistory = history.some(item => {
             const st = String(item.status || item.para_nome || '').toLowerCase();
-            // Match "ação de marketing", "acao de marketing", or simply contains "marketing"
             return st.includes('marketing') || st.includes('ação de marketing') || st.includes('acao de marketing');
           });
 
           if (hasMarketingHistory) {
             excludedByMarketingCount++;
-            continue; // Completely exclude this lead from metrics
+            continue; 
           }
 
           const latest = getLatestMilestone(history);
@@ -216,11 +217,10 @@ export function useInternoDashboard(filters: DashboardFilters) {
             empreendimento: latest.empreendimento
           });
 
-          // Build synthetic funnel based on history up to the selected period
+          // Build synthetic funnel based on history 
           const reachedStages = new Set<string>();
           reachedStages.add('1. Total de Leads');
           
-          // Determine the end date of the selected competencies to cap history
           let capDate = '9999-12-31';
           if (hasSpecificCompetences) {
             const dates = (filters.competences || []).map(c => new Date(c + "T00:00:00Z"));
@@ -230,23 +230,36 @@ export function useInternoDashboard(filters: DashboardFilters) {
             capDate = maxDate.toISOString().split('T')[0];
           }
 
+          let highestScore = 0;
           history.forEach(item => {
              const refDate = item.referencia_data || '';
-             if (refDate > capDate) return; // Point-in-time cap
+             if (refDate > capDate) return; 
 
              const st = (item.status || item.para_nome || '').toLowerCase();
-             // (Historical marketing exclusion is already handled above for the whole lead)
 
              if (!st.includes('aguardando')) reachedStages.add('2. Em Atendimento');
-             if (st.match(/agendam|agendado|visita|proposta|negocia|venda/)) reachedStages.add('3. Agendamento');
-             if (st.match(/visita|proposta|negocia|venda/)) reachedStages.add('4. Visita');
-             if (st.match(/proposta|negocia|venda/)) reachedStages.add('5. Proposta/Negociação');
-             if (st.match(/venda|contrato/)) reachedStages.add('6. Vendas');
+             if (st.match(/agendam|agendado|visita|proposta|negocia|venda/)) {
+               reachedStages.add('3. Agendamento');
+               highestScore = Math.max(highestScore, 1);
+             }
+             if (st.match(/visita|proposta|negocia|venda/)) {
+               reachedStages.add('4. Visita');
+               highestScore = Math.max(highestScore, 2);
+             }
+             if (st.match(/proposta|negocia|venda/)) {
+               reachedStages.add('5. Proposta/Negociação');
+               highestScore = Math.max(highestScore, 3);
+             }
+             if (st.match(/venda|contrato/)) {
+               reachedStages.add('6. Vendas');
+               highestScore = Math.max(highestScore, 4);
+             }
           });
 
           reachedStages.forEach(stage => {
-            syntheticFunnelData.push({ lead_id: lid, etapa_visual: stage });
+            syntheticFunnelCounts[stage] = (syntheticFunnelCounts[stage] || 0) + 1;
           });
+          leadHottestScore.set(lid, highestScore);
         }
 
         console.log(`[Dashboard] Final population: ${leadsData.length} unique leads (Excluded ${excludedByMarketingCount} leads with marketing history)`);
@@ -310,6 +323,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
         const newRawData = {
           leadsData: leadsData || [],
+          syntheticFunnelCounts,
+          leadHottestScore: Object.fromEntries(leadHottestScore),
           funnelRes,
           snapshotRes,
           tmaData,
@@ -469,8 +484,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
     const lineChartKeys = Object.entries(empTotals).sort((a, b) => b[1] - a[1]).map(e => e[0]);
 
     // Funnel Processing
-    const funnelCounts: Record<string, Set<string>> = {};
-    const leadHottestStatus = new Map<string, number>();
+    const funnelCounts: Record<string, number> = { ...rawData.syntheticFunnelCounts };
+    const leadHottestStatusMap = new Map<string, number>(Object.entries(rawData.leadHottestScore || {}));
 
     if (!rawData.funnelRes.error && rawData.funnelRes.data) {
       rawData.funnelRes.data.forEach((row: any) => {
@@ -482,8 +497,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
           const etapaLower = etapa.toLowerCase();
           if (etapaLower === 'ação de marketing' || etapaLower === 'acao de marketing') return;
 
-          if (!funnelCounts[etapa]) funnelCounts[etapa] = new Set();
-          funnelCounts[etapa].add(leadId);
+          funnelCounts[etapa] = (funnelCounts[etapa] || 0) + 1;
 
           const fase = etapa.toLowerCase();
           let score = 0;
@@ -492,9 +506,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
           else if (fase.includes('visita')) score = 2;
           else if (fase.includes('agendamento') || fase.includes('agendado')) score = 1;
           
-          const currentScore = leadHottestStatus.get(leadId) || 0;
+          const currentScore = leadHottestStatusMap.get(leadId) || 0;
           if (score > currentScore) {
-            leadHottestStatus.set(leadId, score);
+            leadHottestStatusMap.set(leadId, score);
           }
         }
       });
@@ -502,9 +516,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
     const funnelData = Object.entries(funnelCounts)
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([name, dataSet]) => ({ name, value: dataSet.size }));
+      .map(([name, count]) => ({ name, value: count }));
       
-    const totalStage = funnelData.find((item: any) => item.name.includes('Total de Leads'));
     const totalLeads = leadsData.length;
 
     const leadOriginMap = new Map<string, string>();
@@ -532,9 +545,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
     const hottestLeadsList: any[] = [];
 
     leadsData.forEach(lead => {
-      let score = leadHottestStatus.get(String(lead.id)) || 0;
+      let score = leadHottestStatusMap.get(String(lead.id)) || 0;
       
-      // Point-in-Time Score Adjustment: If status_atual (already adjusted for pit) says sale/etc, prioritize it
       const st = (lead.status_atual || '').toLowerCase();
       if (st.match(/venda|contrato|fechado/)) score = Math.max(score, 4);
       else if (st.match(/proposta|negocia/)) score = Math.max(score, 3);
@@ -542,9 +554,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
       else if (st.match(/agendam|agendado/)) score = Math.max(score, 1);
 
       if (score >= 4) {
-        if (isAllowedVendaOrigin(lead.origin_treated)) {
-           rCount++;
-        }
+        rCount++;
       }
       if (score >= 3) pCount++;
       if (score >= 2) vCount++;
