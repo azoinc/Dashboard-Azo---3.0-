@@ -178,14 +178,34 @@ const CustomXAxisTick = ({ x, y, payload }: any) => {
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
+    const sum = payload.reduce((acc: number, entry: any) => acc + (Number(entry.value) || 0), 0);
+    
     return (
-      <div className="bg-white border border-slate-200 p-3 rounded-lg shadow-xl">
-        <p className="text-slate-900 font-medium mb-2">{label}</p>
-        {payload.map((entry: any, index: number) => (
-          <p key={index} style={{ color: entry.color }} className="text-sm">
-            {entry.name}: {entry.value}
-          </p>
-        ))}
+      <div className="bg-white/95 backdrop-blur-sm border border-slate-200 p-3 rounded-xl shadow-2xl animate-in fade-in zoom-in duration-200 min-w-[200px]">
+        <p className="text-slate-900 font-bold mb-2 border-b border-slate-100 pb-1.5">{label}</p>
+        <div className="space-y-1.5">
+          {payload.map((entry: any, index: number) => {
+            const percentage = sum > 0 ? ((Number(entry.value) / sum) * 100).toFixed(1) : '0';
+            return (
+              <div key={index} className="flex items-center justify-between space-x-8 text-sm">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 rounded-full shadow-inner" style={{ backgroundColor: entry.color }} />
+                  <span className="text-slate-600 font-medium">{entry.name}:</span>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <span className="font-bold text-slate-900">{entry.value}</span>
+                  <span className="text-[10px] text-slate-400 font-normal">({percentage}%)</span>
+                </div>
+              </div>
+            );
+          })}
+          {payload.length > 1 && (
+             <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-900">
+                <span className="uppercase tracking-wider text-slate-400 font-semibold">Total Acumulado</span>
+                <span>{sum}</span>
+             </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -569,46 +589,54 @@ export default function InternoDashboard({ onBack }: Props) {
               <h3 className="text-sm font-medium text-slate-500 mb-4">Evolução de Status no Mês</h3>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={displayStackedStatusData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                    <XAxis dataKey="status" stroke="#94a3b8" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={80} interval={0} />
-                    <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend 
-                      verticalAlign="top" 
-                      height={36}
-                      formatter={(value, entry: any) => {
-                        // value is the month name
-                        // Find the total for this month across all categories
-                        const monthTotal = displayStackedStatusData.reduce((acc, curr) => acc + (curr[value] || 0), 0);
-                        const grandTotal = displayStackedStatusData.reduce((acc, curr) => {
-                          const rowTotal = availableMonths.reduce((sum, m) => sum + (curr[m] || 0), 0);
-                          return acc + rowTotal;
-                        }, 0);
-                        const percentage = grandTotal > 0 ? ((monthTotal / grandTotal) * 100).toFixed(1) : '0';
-                        return (
-                          <span className="text-slate-600 text-xs font-semibold mr-4">
-                            {value}: {monthTotal} ({percentage}%)
-                          </span>
-                        );
-                      }}
-                    />
-                    {displayAvailableMonths.map((month, idx) => (
-                      <Bar 
-                        key={month} 
-                        dataKey={month} 
-                        stackId="a" 
-                        fill={COLORS[idx % COLORS.length]} 
-                        onClick={(data: any) => setInteractiveFilters(prev => ({ 
-                          ...prev, 
-                          month: prev.month === month && prev.status === data.status ? undefined : month, 
-                          status: prev.month === month && prev.status === data.status ? undefined : data.status 
-                        }))}
-                        className="cursor-pointer hover:opacity-80 transition-opacity"
-                        style={{ cursor: 'pointer' }}
+                    <BarChart data={displayStackedStatusData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="status" stroke="#94a3b8" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={80} interval={0} />
+                      <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend 
+                        verticalAlign="top" 
+                        height={36}
+                        formatter={(value, entry: any) => {
+                          const monthTotal = displayStackedStatusData.reduce((acc, curr) => acc + (curr[value] || 0), 0);
+                          const grandTotal = displayStackedStatusData.reduce((acc, curr) => {
+                            const rowTotal = availableMonths.reduce((sum, m) => sum + (curr[m] || 0), 0);
+                            return acc + rowTotal;
+                          }, 0);
+                          const percentage = grandTotal > 0 ? ((monthTotal / grandTotal) * 100).toFixed(1) : '0';
+                          return (
+                            <span className="text-slate-600 text-xs font-semibold mr-4">
+                              {value}: {monthTotal} ({percentage}%)
+                            </span>
+                          );
+                        }}
                       />
-                    ))}
-                  </BarChart>
+                      {displayAvailableMonths.map((month, idx) => (
+                        <Bar 
+                          key={month} 
+                          dataKey={month} 
+                          stackId="a" 
+                          fill={COLORS[idx % COLORS.length]} 
+                          onClick={(data: any) => setInteractiveFilters(prev => ({ 
+                            ...prev, 
+                            month: prev.month === month && prev.status === data.status ? undefined : month, 
+                            status: prev.month === month && prev.status === data.status ? undefined : data.status 
+                          }))}
+                          className="cursor-pointer hover:opacity-80 transition-opacity"
+                        >
+                          {idx === displayAvailableMonths.length - 1 && (
+                            <LabelList 
+                              dataKey="total" 
+                              position="top" 
+                              fill="#64748b" 
+                              fontSize={10} 
+                              fontWeight="bold" 
+                              offset={10}
+                            />
+                          )}
+                        </Bar>
+                      ))}
+                    </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
@@ -634,16 +662,40 @@ export default function InternoDashboard({ onBack }: Props) {
                         cx="50%"
                         cy="50%"
                         outerRadius={80}
-                        innerRadius={40}
+                        innerRadius={50}
                         fill="#8884d8"
                         onClick={(data: any) => setInteractiveFilters(prev => ({ ...prev, cancelReason: prev.cancelReason === data.reason ? undefined : data.reason }))}
                         className="cursor-pointer"
+                        stroke="none"
                         style={{ cursor: 'pointer' }}
+                        label={({ cx, cy, midAngle, innerRadius, outerRadius, value, index }) => {
+                          const total = displayCancelReasons.reduce((acc, curr) => acc + curr.count, 0);
+                          const percent = (value / total) * 100;
+                          if (percent < 10) return null; // Don't show labels for small slices to avoid clutter
+                          const RADIAN = Math.PI / 180;
+                          const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                          const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                          const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                          return (
+                            <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight="bold">
+                              {percent.toFixed(0)}%
+                            </text>
+                          );
+                        }}
+                        labelLine={false}
                       >
                         {displayCancelReasons.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition-opacity outline-none" style={{ cursor: 'pointer' }} />
                         ))}
                       </Pie>
+                      <g>
+                        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central">
+                          <tspan x="50%" dy="-0.5em" fontSize="10" fill="#94a3b8" fontWeight="bold">TOTAL</tspan>
+                          <tspan x="50%" dy="1.2em" fontSize="14" fill="#61072E" fontWeight="bold">
+                            {displayCancelReasons.reduce((acc, curr) => acc + curr.count, 0)}
+                          </tspan>
+                        </text>
+                      </g>
                       <Tooltip content={<CustomTooltip />} />
                       <Legend 
                         layout="vertical" 
@@ -673,16 +725,40 @@ export default function InternoDashboard({ onBack }: Props) {
                         cx="50%"
                         cy="50%"
                         outerRadius={80}
-                        innerRadius={40}
+                        innerRadius={50}
                         fill="#8884d8"
                         onClick={(data: any) => setInteractiveFilters(prev => ({ ...prev, origin: prev.origin === data.name ? undefined : data.name }))}
                         className="cursor-pointer"
+                        stroke="none"
                         style={{ cursor: 'pointer' }}
+                        label={({ cx, cy, midAngle, innerRadius, outerRadius, value, index }) => {
+                          const total = displayOriginData.reduce((acc, curr) => acc + curr.value, 0);
+                          const percent = (value / total) * 100;
+                          if (percent < 10) return null;
+                          const RADIAN = Math.PI / 180;
+                          const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                          const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                          const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                          return (
+                            <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight="bold">
+                              {percent.toFixed(0)}%
+                            </text>
+                          );
+                        }}
+                        labelLine={false}
                       >
                         {displayOriginData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition-opacity outline-none" style={{ cursor: 'pointer' }} />
                         ))}
                       </Pie>
+                      <g>
+                        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central">
+                          <tspan x="50%" dy="-0.5em" fontSize="10" fill="#94a3b8" fontWeight="bold">TOTAL</tspan>
+                          <tspan x="50%" dy="1.2em" fontSize="14" fill="#61072E" fontWeight="bold">
+                            {displayOriginData.reduce((acc, curr) => acc + curr.value, 0)}
+                          </tspan>
+                        </text>
+                      </g>
                       <Tooltip content={<CustomTooltip />} />
                       <Legend 
                         layout="vertical" 
@@ -836,7 +912,20 @@ export default function InternoDashboard({ onBack }: Props) {
                           return <span className="text-slate-600 text-[10px]">{value}: <strong>{val}</strong> ({percent}%)</span>;
                         }}
                       />
-                      <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]}>
+                        <LabelList 
+                          dataKey="value" 
+                          position="right" 
+                          fill="#64748b" 
+                          fontSize={11} 
+                          fontWeight="bold"
+                          formatter={(val: number) => {
+                             const total = displayBrokerLeads.reduce((acc, curr) => acc + curr.value, 0);
+                             const percent = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
+                             return `${val} (${percent}%)`;
+                          }}
+                        />
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -867,13 +956,15 @@ export default function InternoDashboard({ onBack }: Props) {
               <h3 className="text-sm font-medium text-slate-500 mb-4">Tempo Médio de Recepção do Lead (Horas)</h3>
               <div className="h-96">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={displayBrokerTime} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-                    <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} width={120} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="time" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-                  </BarChart>
+                    <BarChart data={displayBrokerTime} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                      <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} width={120} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="time" fill="#3b82f6" radius={[0, 4, 4, 0]}>
+                        <LabelList dataKey="time" position="right" fill="#64748b" fontSize={11} fontWeight="bold" formatter={(val: number) => `${val}h`} />
+                      </Bar>
+                    </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
@@ -882,13 +973,15 @@ export default function InternoDashboard({ onBack }: Props) {
               <h3 className="text-sm font-medium text-slate-500 mb-4">Ações no CV</h3>
               <div className="h-96">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={displayBrokerActions} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-                    <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} width={120} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="actions" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-                  </BarChart>
+                    <BarChart data={displayBrokerActions} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                      <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} width={120} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="actions" fill="#3b82f6" radius={[0, 4, 4, 0]}>
+                        <LabelList dataKey="actions" position="right" fill="#64748b" fontSize={11} fontWeight="bold" />
+                      </Bar>
+                    </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
