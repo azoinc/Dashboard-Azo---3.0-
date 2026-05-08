@@ -135,9 +135,14 @@ export function useInternoDashboard(filters: DashboardFilters) {
           .select('lead_id, lead_nome, status, para_nome, lead_data_cad, origem, corretor, empreendimento, motivo_cancelamento, referencia_data, hora_referencia_data')
           .limit(40000);
 
-        // Apply primary date filter
+        // ALWAYS apply registration date filter as requested
+        // "no primeiro filtro de tempo 'todo o periodo'/calendario, ele deve filtrar apenas os leads que foram cadastrados naquele periodo especifico"
+        milestonesQuery = (milestonesQuery as any)
+          .gte('lead_data_cad', startDateSimple)
+          .lte('lead_data_cad', endDateInclusive);
+
+        // Apply secondary month filter (competency) if active
         if (hasSpecificCompetences) {
-          // If a Specific Competence is selected, we prioritize fetching milestones for that month
           const dates = (filters.competences || []).map(c => new Date(c + "T00:00:00Z"));
           const compStartDate = new Date(Math.min(...dates.map(d => d.getTime())));
           const compEndDate = new Date(Math.max(...dates.map(d => d.getTime())));
@@ -147,20 +152,6 @@ export function useInternoDashboard(filters: DashboardFilters) {
           milestonesQuery = (milestonesQuery as any)
             .gte('referencia_data', compStartDate.toISOString().split('T')[0])
             .lte('referencia_data', compEndDate.toISOString().split('T')[0]);
-          
-          // Optionally still filter by registration date if not "Todo o período"
-          if (!isTodoPeriodo) {
-            milestonesQuery = (milestonesQuery as any)
-              .gte('lead_data_cad', startDateSimple)
-              .lte('lead_data_cad', endDateInclusive);
-          }
-        } else {
-          // No specific competence: use registration date as primary filter
-          if (!isTodoPeriodo) {
-            milestonesQuery = (milestonesQuery as any)
-              .gte('lead_data_cad', startDateSimple)
-              .lte('lead_data_cad', endDateInclusive);
-          }
         }
 
         milestonesQuery = applyProjectFilter(milestonesQuery);
