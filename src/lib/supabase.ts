@@ -34,6 +34,18 @@ export const supabase = {
             }
             return queryBuilder;
           },
+          ilike: (column: string, value: string) => {
+            if (value !== undefined && value !== null) {
+              filters.push({ column, operator: 'ilike', value });
+            }
+            return queryBuilder;
+          },
+          or: (value: string) => {
+            if (value !== undefined && value !== null) {
+              filters.push({ column: '', operator: 'or', value });
+            }
+            return queryBuilder;
+          },
           limit: (count: number) => {
             limitVal = count;
             return queryBuilder;
