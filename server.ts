@@ -2,15 +2,19 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import pg from "pg";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const { Pool } = pg;
 
+// Prioritize environment variables, fallback to provided credentials if needed
 const pool = new Pool({
-  host: "aws-1-sa-east-1.pooler.supabase.com",
+  host: process.env.SP_HOST || "aws-1-sa-east-1.pooler.supabase.com",
   database: "postgres",
-  user: "postgres.gmvmdryoisurvhtdrppb",
-  password: "Azo@2025#Inc",
-  port: 6543,
+  user: process.env.SP_USER || "postgres.gmvmdryoisurvhtdrppb",
+  password: process.env.SP_PS || "Azo@2025#Inc",
+  port: Number(process.env.SP_PORT) || 6543,
   ssl: {
     rejectUnauthorized: false
   }
@@ -25,6 +29,11 @@ async function startServer() {
   // Generic query endpoint to replace Supabase client
   app.post("/api/query", async (req, res) => {
     try {
+      // Allow only POST requests (parity with api/query.ts fallback)
+      if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method Not Allowed' });
+      }
+
       const { table, select, filters, inFilters, limit, order } = req.body;
       
       let query = `SELECT ${select || '*'} FROM ${table} WHERE 1=1`;
@@ -38,6 +47,10 @@ async function startServer() {
             query += ` AND "${column}" = $${paramIndex}`;
             values.push(value);
             paramIndex++;
+          } else if (operator === 'ilike') {
+            query += ` AND "${column}" ILIKE $${paramIndex}`;
+            values.push(value);
+            paramIndex++;
           } else if (operator === 'gte') {
             query += ` AND "${column}" >= $${paramIndex}`;
             values.push(value);
@@ -46,6 +59,20 @@ async function startServer() {
             query += ` AND "${column}" <= $${paramIndex}`;
             values.push(value);
             paramIndex++;
+          } else if (operator === 'or') {
+            // Simplified OR: expects a string like "col1.ilike.%val%,col2.eq.val"
+            // We'll support a very limited subset for now: col.ilike.%val% OR col.ilike.%val%
+            const parts = value.split(',');
+            const orClauses = parts.map((p: string) => {
+              const [col, op, val] = p.split('.');
+              if (op === 'ilike') {
+                const placeholder = `$${paramIndex++}`;
+                values.push(val.replace(/\//g, '')); // basic cleanup
+                return `"${col}" ILIKE ${placeholder}`;
+              }
+              return '1=0';
+            });
+            query += ` AND (${orClauses.join(' OR ')})`;
           }
         }
       }
