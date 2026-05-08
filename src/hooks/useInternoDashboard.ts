@@ -116,12 +116,12 @@ export function useInternoDashboard(filters: DashboardFilters) {
         const isTodoPeriodo = filters.period === 'Todo o período';
 
         const applyProjectFilter = (query: any) => {
-          if (filters.project !== 'Todos') {
+          if (filters.project && filters.project !== 'Todos') {
             return (query as any).ilike('empreendimento', `%${filters.project}%`);
           } else if (filters.city && filters.city !== 'ALL') {
              const cityProjects = PROJECTS_BY_CITY[filters.city as keyof typeof PROJECTS_BY_CITY];
              if (cityProjects && cityProjects.length > 0) {
-               return query.in('empreendimento', cityProjects);
+               return (query as any).in('empreendimento', cityProjects);
              }
           }
           return query;
@@ -140,11 +140,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
           .gte('lead_data_cad', startDateSimple)
           .lte('lead_data_cad', endDateInclusive);
 
-        // CRITICAL: We NO LONGER apply 'referencia_data' filter here.
-        // The population is defined strictly by the registration date.
-        // If hasSpecificCompetences is active, we use those leads' history and snapshots to show their state at that time.
-
+        // Apply project filter to milestones query
         milestonesQuery = applyProjectFilter(milestonesQuery);
+
         if (filters.broker !== 'Todos') {
           milestonesQuery = (milestonesQuery as any).ilike('corretor', `%${filters.broker}%`);
         }
@@ -278,9 +276,16 @@ export function useInternoDashboard(filters: DashboardFilters) {
              const chunkPromises: Promise<any>[] = [];
              
              if (!hasSpecificCompetences) {
-               chunkPromises.push(supabase.from('view_funil_maximo_com_total').select('etapa_visual, lead_id').in('lead_id', chunk) as any);
+               let q = supabase.from('view_funil_maximo_com_total').select('etapa_visual, lead_id').in('lead_id', chunk);
+               q = applyProjectFilter(q); // Filter by project in metrics too
+               chunkPromises.push(q as any);
              }
-             chunkPromises.push(supabase.from('view_lead_snapshot_mensal').select('status_final_mes, competencia_data, lead_id').in('lead_id', chunk) as any);
+             
+             let sq = supabase.from('view_lead_snapshot_mensal').select('status_final_mes, competencia_data, lead_id').in('lead_id', chunk);
+             sq = applyProjectFilter(sq); // Filter by project in metrics too
+             chunkPromises.push(sq as any);
+
+             // TMA and esforço normally follow the broker but we can add project filter if column exists
              chunkPromises.push(supabase.from('view_tma_fila_atendimento').select('corretor, segundos_espera').in('lead_id', chunk) as any);
              chunkPromises.push(supabase.from('view_esforco_corretor').select('corretor, lead_id').in('lead_id', chunk) as any);
 
