@@ -136,7 +136,6 @@ export function useInternoDashboard(filters: DashboardFilters) {
           .limit(50000);
 
         // ALWAYS apply registration date filter as requested
-        // "no primeiro filtro de tempo 'todo o periodo'/calendario, ele deve filtrar apenas os leads que foram cadastrados naquele periodo especifico"
         milestonesQuery = (milestonesQuery as any)
           .gte('lead_data_cad', startDateSimple)
           .lte('lead_data_cad', endDateInclusive);
@@ -163,7 +162,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
         if (milestonesError) throw milestonesError;
 
         const rawDataFromMilestones = milestonesData || [];
-        console.log(`[Dashboard] Fetched ${rawDataFromMilestones.length} milestones`);
+        console.log(`[Dashboard] Fetched ${rawDataFromMilestones.length} raw milestones`);
 
         if (rawDataFromMilestones.length === 0) {
            setRawData({
@@ -177,86 +176,70 @@ export function useInternoDashboard(filters: DashboardFilters) {
            return;
         }
 
-        // PHASE 1.5: Final check for 'Ação de Marketing' in ANY milestone for these leads (Historical Exclusion)
-        const candidateLeadIds = Array.from(new Set(
-          rawDataFromMilestones.map(m => String(m.lead_id)).filter(id => id && id !== 'null' && id !== 'undefined')
-        ));
-
-        const excludedLeadIds = new Set<string>();
-        if (candidateLeadIds.length > 0) {
-          const chunkSize = 2000; // Larger chunks for fewer total requests
-          const batches = [];
-          for (let i = 0; i < candidateLeadIds.length; i += chunkSize) {
-            batches.push(candidateLeadIds.slice(i, i + chunkSize));
-          }
-
-          console.time('[ExclusionCheck]');
-          // Process sequentially or in very small parallel groups to avoid overloading the pooler
-          for (const chunk of batches) {
-            const { data: exclusionData, error: exclusionError } = await supabase
-              .from('lead_milestones')
-              .select('lead_id')
-              .or('para_nome.ilike.%ação de marketing%,para_nome.ilike.%acao de marketing%,para_nome.ilike.%marketing%')
-              .in('lead_id', chunk)
-              .limit(50000);
-            
-            if (exclusionError) {
-              console.error('[ExclusionCheck] Error:', exclusionError);
-              continue;
-            }
-
-            if (exclusionData) {
-              exclusionData.forEach(r => excludedLeadIds.add(String(r.lead_id)));
-            }
-          }
-          console.timeEnd('[ExclusionCheck]');
-          console.log(`[Dashboard] Excluded ${excludedLeadIds.size} leads out of ${candidateLeadIds.length} unique leads found in milestones`);
-        }
-
         // PHASE 2: Deduplicate and build leads population
-        
-        // Sort to ensure we get a consistent view of the latest state if needed
-        const sortedMilestones = [...rawDataFromMilestones].sort((a, b) => {
-          if (a.referencia_data !== b.referencia_data) return b.referencia_data.localeCompare(a.referencia_data);
-          return (b.hora_referencia_data || '').localeCompare(a.hora_referencia_data || '');
+        // Group milestones by lead to find the latest state
+        const milestonesByLead = new Map<string, any[]>();
+        rawDataFromMilestones.forEach(m => {
+          const lid = String(m.lead_id);
+          if (!lid || lid === 'null' || lid === 'undefined') return;
+          if (!milestonesByLead.has(lid)) milestonesByLead.set(lid, []);
+          milestonesByLead.get(lid)!.push(m);
         });
 
-        const seenLeads = new Set();
         const leadsData: any[] = [];
         const syntheticFunnelData: any[] = [];
 
-        for (const item of sortedMilestones) {
-          const lid = String(item.lead_id);
-          if (!lid || lid === 'null' || lid === 'undefined') continue;
+        // Sort helper for milestones (Latest first)
+        const getLatestMilestone = (list: any[]) => {
+          return [...list].sort((a, b) => {
+            const dateA = a.referencia_data || '';
+            const dateB = b.referencia_data || '';
+            if (dateA !== dateB) return dateB.localeCompare(dateA);
+            const timeA = a.hora_referencia_data || '';
+            const timeB = b.hora_referencia_data || '';
+            return timeB.localeCompare(timeA);
+          })[0];
+        };
 
-          // Historical exclusion check
-          if (excludedLeadIds.has(lid)) continue;
+        for (const [lid, history] of milestonesByLead.entries()) {
+          const latest = getLatestMilestone(history);
+          if (!latest) continue;
 
-          const statusLower = String(item.status || item.para_nome || '').toLowerCase();
+          // We show all leads that passed the registration date filter
+          // Filter 'Ação de Marketing' specifically in the charts later
+          leadsData.push({
+            status_atual: latest.status || latest.para_nome || 'Sem Status',
+            id: lid,
+            nome: latest.lead_nome,
+            lead_data_cad: latest.lead_data_cad,
+            origem: latest.origem,
+            motivo_cancelamento: latest.motivo_cancelamento,
+            corretor: latest.corretor,
+            empreendimento: latest.empreendimento
+          });
 
-          if (!seenLeads.has(lid)) {
-             seenLeads.add(lid);
-             leadsData.push({
-               status_atual: item.status || item.para_nome || 'Sem Status',
-               id: lid,
-               nome: item.lead_nome,
-               lead_data_cad: item.lead_data_cad,
-               origem: item.origem,
-               motivo_cancelamento: item.motivo_cancelamento,
-               corretor: item.corretor,
-               empreendimento: item.empreendimento
-             });
-          }
+          // Build synthetic funnel based on full history
+          const reachedStages = new Set<string>();
+          reachedStages.add('1. Total de Leads');
+          
+          history.forEach(item => {
+             const st = (item.status || item.para_nome || '').toLowerCase();
+             if (st.includes('ação de marketing') || st.includes('acao de marketing')) return;
 
-          // Historical Funnel logic from milestones
-          const st = statusLower;
-          syntheticFunnelData.push({ lead_id: lid, etapa_visual: '1. Total de Leads' });
-          if (!st.includes('aguardando')) syntheticFunnelData.push({ lead_id: lid, etapa_visual: '2. Em Atendimento' });
-          if (st.match(/agendam|agendado|visita|proposta|negocia|venda|contrato/)) syntheticFunnelData.push({ lead_id: lid, etapa_visual: '3. Agendamento' });
-          if (st.match(/visita|proposta|negocia|venda|contrato/)) syntheticFunnelData.push({ lead_id: lid, etapa_visual: '4. Visita' });
-          if (st.match(/proposta|negocia|venda|contrato/)) syntheticFunnelData.push({ lead_id: lid, etapa_visual: '5. Proposta/Negociação' });
-          if (st.match(/venda|contrato/)) syntheticFunnelData.push({ lead_id: lid, etapa_visual: '6. Vendas' });
+             if (!st.includes('aguardando')) reachedStages.add('2. Em Atendimento');
+             if (st.match(/agendam|agendado|visita|proposta|negocia|venda/)) reachedStages.add('3. Agendamento');
+             if (st.match(/visita|proposta|negocia|venda/)) reachedStages.add('4. Visita');
+             if (st.match(/proposta|negocia|venda/)) reachedStages.add('5. Proposta/Negociação');
+             if (st.match(/venda|contrato/)) reachedStages.add('6. Vendas');
+          });
+
+          reachedStages.forEach(stage => {
+            syntheticFunnelData.push({ lead_id: lid, etapa_visual: stage });
+          });
         }
+
+        console.log(`[Dashboard] Final population: ${leadsData.length} unique leads`);
+
 
         let funnelRes = { data: [] as any[], error: null };
         let snapshotRes: any[] = [];
