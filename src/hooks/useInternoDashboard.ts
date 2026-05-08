@@ -106,8 +106,14 @@ export function useInternoDashboard(filters: DashboardFilters) {
           return `${y}-${m}-${d}T00:00:00.000Z`;
         };
 
-        const startDateStr = formatYYYYMMDDStart(startDate);
-        const endDateStr = formatYYYYMMDDEnd(endDate);
+        const startDateStrFull = formatYYYYMMDDStart(startDate);
+        const endDateStrFull = formatYYYYMMDDEnd(endDate);
+
+        // More robust date strings for different backend column types
+        const startDateSimple = startDateStrFull.split('T')[0];
+        const endDateSimple = endDateStrFull.split('T')[0];
+        const startDateBound = startDateSimple + ' 00:00:00';
+        const endDateBound = endDateSimple + ' 23:59:59';
 
         const isTodoPeriodo = filters.period === 'Todo o período';
 
@@ -145,13 +151,12 @@ export function useInternoDashboard(filters: DashboardFilters) {
             .from('lead_milestones')
             .select('lead_id, lead_nome, status, para_nome, lead_data_cad, origem, corretor, empreendimento, motivo_cancelamento, referencia_data, hora_referencia_data')
             .gte('referencia_data', compStartStr)
-            .lte('referencia_data', compEndStr);
+            .lte('referencia_data', compEndStr)
+            .limit(30000); // Increased limit significantly
             
           // The primary date period selector validates the create date of the lead
           if (!isTodoPeriodo) {
-            const startDateSimple = startDateStr.split('T')[0];
-            const endDateSimple = endDateStr.split('T')[0];
-            snapshotQuery = (snapshotQuery as any).gte('lead_data_cad', startDateSimple).lte('lead_data_cad', endDateSimple);
+            snapshotQuery = (snapshotQuery as any).gte('lead_data_cad', startDateBound).lte('lead_data_cad', endDateBound);
           }
           
           snapshotQuery = applyProjectFilter(snapshotQuery);
@@ -166,8 +171,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
           let leadsQuery = supabase
             .from('leads')
             .select('status_atual, nome, id_cv, data_criacao_cv, origem, motivo_cancelamento, corretor, empreendimento')
-            .gte('data_criacao_cv', startDateStr)
-            .lte('data_criacao_cv', endDateStr);
+            .gte('data_criacao_cv', startDateStrFull)
+            .lte('data_criacao_cv', endDateStrFull)
+            .limit(10000);
 
           leadsQuery = applyProjectFilter(leadsQuery);
           if (filters.broker !== 'Todos') {
@@ -180,11 +186,10 @@ export function useInternoDashboard(filters: DashboardFilters) {
         }
 
         // --- Gather all candidate IDs to fetch exclusions ---
-        // For exclusion, we must check if "Ação de Marketing" ever appeared in milestones
         const candidateLeadIds = Array.from(new Set([
           ...rawSnapshotData.map((r: any) => String(r.lead_id)),
           ...rawLeadsData.map((r: any) => String(r.id_cv))
-        ])).filter(id => id != null && id !== 'undefined');
+        ])).filter(id => id != null && id !== 'undefined' && id !== 'null');
 
         const excludedLeadIds = new Set<string>();
 
@@ -198,12 +203,14 @@ export function useInternoDashboard(filters: DashboardFilters) {
                  .from('lead_milestones')
                  .select('lead_id, para_nome, status')
                  .in('lead_id', chunk)
+                 .limit(10000)
              );
              exclusionPromises.push(
                supabase
                  .from('leads')
                  .select('id_cv, status_atual, motivo_cancelamento, origem')
                  .in('id_cv', chunk)
+                 .limit(10000)
              );
           }
           const exclusionRes = await Promise.all(exclusionPromises);
