@@ -75,7 +75,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
         let endDate = new Date();
 
         if (filters.period === 'Todo o período') {
-          startDate = new Date(2026, 0, 1);
+          startDate = new Date(2010, 0, 1);
         } else if (filters.period === 'Últimos 30 dias') {
           startDate.setDate(now.getDate() - 30);
         } else if (filters.period === 'Este mês' || filters.period === 'Mês Atual') {
@@ -90,7 +90,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
           startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         }
 
-        const globalMinDate = new Date(2026, 0, 1);
+        const globalMinDate = new Date(2010, 0, 1);
         if (startDate < globalMinDate) startDate = globalMinDate;
 
         const formatYYYYMMDDEnd = (date: Date) => {
@@ -133,7 +133,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
         let milestonesQuery = supabase
           .from('lead_milestones')
           .select('lead_id, lead_nome, status, para_nome, lead_data_cad, origem, corretor, empreendimento, motivo_cancelamento, referencia_data, hora_referencia_data')
-          .limit(40000);
+          .limit(50000);
 
         // ALWAYS apply registration date filter as requested
         // "no primeiro filtro de tempo 'todo o periodo'/calendario, ele deve filtrar apenas os leads que foram cadastrados naquele periodo especifico"
@@ -165,6 +165,18 @@ export function useInternoDashboard(filters: DashboardFilters) {
         const rawDataFromMilestones = milestonesData || [];
         console.log(`[Dashboard] Fetched ${rawDataFromMilestones.length} milestones`);
 
+        if (rawDataFromMilestones.length === 0) {
+           setRawData({
+             leadsData: [],
+             funnelRes: { data: [], error: null },
+             snapshotRes: [],
+             tmaData: [],
+             actionsData: []
+           });
+           setLoading(false);
+           return;
+        }
+
         // PHASE 1.5: Final check for 'Ação de Marketing' in ANY milestone for these leads (Historical Exclusion)
         const candidateLeadIds = Array.from(new Set(
           rawDataFromMilestones.map(m => String(m.lead_id)).filter(id => id && id !== 'null' && id !== 'undefined')
@@ -182,6 +194,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
                 .select('lead_id')
                 .or('status.ilike.%ação de marketing%,para_nome.ilike.%ação de marketing%,origem.ilike.%ação de marketing%,status.ilike.%acao de marketing%,para_nome.ilike.%acao de marketing%,origem.ilike.%acao de marketing%')
                 .in('lead_id', chunk)
+                .limit(50000)
             );
           }
           
@@ -246,7 +259,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
         if (leadsData.length > 0) {
            const leadIds = leadsData.map(l => l.id);
-           const chunkSize = 500;
+           const chunkSize = 1000;
            const promises: Promise<any>[] = [];
 
            for (let i = 0; i < leadIds.length; i += chunkSize) {
