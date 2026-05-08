@@ -39,9 +39,30 @@ export const siengeService = {
       
       console.log(`Unidades Sienge API Response for ${enterpriseId}:`, data.results && data.results[0]);
       
-      const disponiveisUnits = data.results?.filter((u: any) => u.status === 'DISPONIVEL' || u.status === 'DISPONIBILIZADA' || u.status === 'AVAILABLE' || String(u.status).toUpperCase().includes('DISP')) || [];
+      // "unidades que não foram vendidas"
+      const disponiveisUnits = data.results?.filter((u: any) => {
+        const status = String(u.status || '').toUpperCase();
+        return status !== 'VENDIDA' && status !== 'SOLD' && !status.includes('VENDID');
+      }) || [];
+      
       const disponiveis = disponiveisUnits.length || 0;
-      const vgvEstoque = disponiveisUnits.reduce((acc: number, curr: any) => acc + (curr.basePrice || curr.price || curr.salePrice || curr.suggestedPrice || curr.contractValue || curr.value || curr.cubPrice || curr.appraisalValue || 0), 0) || 0;
+      
+      const vgvEstoque = disponiveisUnits.reduce((acc: number, curr: any) => {
+        const unitValue = 
+          curr.vgv || 
+          curr.basePrice || 
+          curr.price || 
+          curr.salePrice || 
+          curr.suggestedPrice || 
+          curr.contractValue || 
+          curr.value || 
+          curr.cubPrice || 
+          curr.appraisalValue || 
+          (curr.prices && curr.prices.length > 0 ? curr.prices[0].value : 0) ||
+          (curr.pricing ? curr.pricing.value || curr.pricing.price : 0) ||
+          0;
+        return acc + unitValue;
+      }, 0) || 0;
       
       console.log(`Enterprise ${enterpriseId} disponiveis:`, disponiveis, 'vgvEstoque:', vgvEstoque);
       return {
