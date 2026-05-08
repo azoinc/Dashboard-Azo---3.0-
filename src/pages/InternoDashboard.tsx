@@ -143,11 +143,11 @@ const mockBrokerActions = [
 ];
 
 const mockAdsProjectData = [
-  { name: 'Ipanema', meta: 95, google: 100 },
+  { name: 'Ar Ipanema', meta: 95, google: 100 },
   { name: 'Casa da Mata', meta: 95, google: 95 },
-  { name: 'Insigna', meta: 90, google: 30 },
-  { name: 'Verter', meta: 95, google: 0 },
-  { name: 'Ares', meta: 90, google: 0 },
+  { name: 'Insigna Peninsula', meta: 90, google: 30 },
+  { name: 'Verter Cambui', meta: 95, google: 0 },
+  { name: 'Ares Home', meta: 90, google: 0 },
 ];
 
 const mockAdsTimeData = [
@@ -241,63 +241,21 @@ const CustomFunnel = ({ data, total }: { data: any[], total: number }) => {
   }
 
   return (
-    <div className="relative w-full h-full flex flex-col md:flex-row items-center justify-center p-2">
-      <div className="w-full md:w-[60%] h-full relative">
-        <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" className="overflow-visible">
-          <AnimatePresence mode="wait">
-            {data.map((item, idx) => {
-              const n = data.length;
-              const yTop = (idx / n) * 100;
-              const yBottom = ((idx + 1) / n) * 100;
-              
-              // Width goes from 90% at top to 20% at bottom
-              const wTop = 100 - (idx / n) * 70;
-              const wBottom = 100 - ((idx + 1) / n) * 70;
-              
-              const xTopLeft = (100 - wTop) / 2;
-              const xTopRight = 100 - xTopLeft;
-              const xBottomLeft = (100 - wBottom) / 2;
-              const xBottomRight = 100 - xBottomLeft;
-              
-              const points = `${xTopLeft},${yTop} ${xTopRight},${yTop} ${xBottomRight},${yBottom} ${xBottomLeft},${yBottom}`;
-              
-              return (
-                <motion.polygon
-                  key={`${item.name}-${idx}`}
-                  initial={{ opacity: 0, scaleY: 0, y: -20 }}
-                  animate={{ opacity: 1, scaleY: 1, y: 0 }}
-                  exit={{ opacity: 0, scaleY: 0 }}
-                  transition={{ duration: 0.5, delay: idx * 0.1, ease: [0.23, 1, 0.32, 1] }}
-                  points={points}
-                  fill={colors[idx % colors.length]}
-                  className="hover:brightness-110 transition-all cursor-default filter drop-shadow-sm"
-                  style={{ transformOrigin: 'top' }}
-                />
-              );
-            })}
-          </AnimatePresence>
-        </svg>
-
-        {/* Dynamic labels centered over the polygons */}
-        <div className="absolute inset-0 pointer-events-none flex flex-col">
-          {data.map((item, idx) => {
-            const percentage = total > 0 ? ((item.value / total) * 100).toFixed(1) : '0.0';
-            return (
-                <motion.div 
-                key={`label-${idx}`}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.6 + (idx * 0.1), type: 'spring', stiffness: 100 }}
-                className="flex-1 flex flex-col items-center justify-center text-white overflow-hidden px-2 text-center"
-                style={{ textShadow: '0 2px 4px rgba(0,0,0,0.4)' }}
-              >
-                <span className="text-[9px] font-bold uppercase tracking-tighter opacity-90 truncate w-full leading-tight">{item.name}</span>
-                <span className="text-sm font-black tracking-tight">{item.value} <span className="text-[10px] font-medium opacity-80">({percentage}%)</span></span>
-              </motion.div>
-            );
-          })}
-        </div>
-      </div>
+    <div className="relative w-full h-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <FunnelChart>
+          <Tooltip content={<CustomTooltip />} />
+          <Funnel
+            data={data}
+            dataKey="value"
+          >
+            <LabelList position="right" fill="#64748b" stroke="none" fontSize={11} dataKey="name" />
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+            ))}
+          </Funnel>
+        </FunnelChart>
+      </ResponsiveContainer>
     </div>
   );
 };
@@ -657,14 +615,14 @@ export default function InternoDashboard({ onBack }: Props) {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-xl border border-slate-200">
                 <h3 className="text-sm font-medium text-slate-500 mb-4">Funil Status Atual</h3>
-                <div className="h-96">
+                <div className="h-64">
                   <CustomFunnel data={displayFunnelData} total={totalLeads || 1551} />
                 </div>
               </div>
 
               <div className="bg-white p-6 rounded-xl border border-slate-200">
                 <h3 className="text-sm font-medium text-slate-500 mb-4">Motivo Cancelamento</h3>
-                <div className="h-96">
+                <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -677,53 +635,24 @@ export default function InternoDashboard({ onBack }: Props) {
                         innerRadius={50}
                         paddingAngle={2}
                         fill="#8884d8"
-                        isAnimationActive={true}
-                        animationBegin={200}
-                        animationDuration={1200}
-                        animationEasing="ease-out"
                         onClick={(data: any) => setInteractiveFilters(prev => ({ ...prev, cancelReason: prev.cancelReason === data.reason ? undefined : data.reason }))}
                         className="cursor-pointer"
                         stroke="none"
-                        style={{ cursor: 'pointer' }}
-                        label={({ cx, cy, midAngle, innerRadius, outerRadius, value, index }) => {
-                          const total = displayCancelReasons.reduce((acc, curr) => acc + curr.count, 0);
-                          const percent = (value / total) * 100;
-                          if (percent < 12) return null; // Only labels for > 12%
-                          const RADIAN = Math.PI / 180;
-                          const radius = outerRadius + 15;
-                          const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                          const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                          return (
-                            <text x={x} y={y} fill="#64748b" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={9} fontWeight="bold">
-                              {percent.toFixed(0)}%
-                            </text>
-                          );
-                        }}
-                        labelLine={{ stroke: '#cbd5e1', strokeWidth: 1 }}
                       >
                         {displayCancelReasons.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition-opacity outline-none" style={{ cursor: 'pointer' }} />
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <g>
-                        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central">
-                          <tspan x="50%" dy="-0.5em" fontSize="10" fill="#94a3b8" fontWeight="bold">TOTAL</tspan>
-                          <tspan x="50%" dy="1.2em" fontSize="14" fill="#61072E" fontWeight="bold">
-                            {displayCancelReasons.reduce((acc, curr) => acc + curr.count, 0)}
-                          </tspan>
-                        </text>
-                      </g>
                       <Tooltip content={<CustomTooltip />} />
                       <Legend 
                         layout="horizontal" 
                         align="center" 
                         verticalAlign="bottom"
-                        wrapperStyle={{ paddingTop: '20px' }}
                         formatter={(value, entry: any) => {
                           const total = displayCancelReasons.reduce((acc, curr) => acc + curr.count, 0);
                           const val = entry.payload.count || 0;
                           const percent = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
-                          return <span className="text-slate-500 text-[9px] font-medium mr-2">{value} <span className="text-slate-900 font-bold">({val})</span></span>;
+                          return <span className="text-slate-500 text-[10px]">{value} ({percent}%)</span>;
                         }}
                       />
                     </PieChart>
@@ -733,7 +662,7 @@ export default function InternoDashboard({ onBack }: Props) {
 
               <div className="bg-white p-6 rounded-xl border border-slate-200">
                 <h3 className="text-sm font-medium text-slate-500 mb-4">Origem</h3>
-                <div className="h-96">
+                <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -746,53 +675,24 @@ export default function InternoDashboard({ onBack }: Props) {
                         innerRadius={50}
                         paddingAngle={2}
                         fill="#8884d8"
-                        isAnimationActive={true}
-                        animationBegin={400}
-                        animationDuration={1200}
-                        animationEasing="ease-out"
                         onClick={(data: any) => setInteractiveFilters(prev => ({ ...prev, origin: prev.origin === data.name ? undefined : data.name }))}
                         className="cursor-pointer"
                         stroke="none"
-                        style={{ cursor: 'pointer' }}
-                        label={({ cx, cy, midAngle, innerRadius, outerRadius, value, index }) => {
-                          const total = displayOriginData.reduce((acc, curr) => acc + curr.value, 0);
-                          const percent = (value / total) * 100;
-                          if (percent < 12) return null;
-                          const RADIAN = Math.PI / 180;
-                          const radius = outerRadius + 15;
-                          const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                          const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                          return (
-                            <text x={x} y={y} fill="#64748b" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={9} fontWeight="bold">
-                              {percent.toFixed(0)}%
-                            </text>
-                          );
-                        }}
-                        labelLine={{ stroke: '#cbd5e1', strokeWidth: 1 }}
                       >
                         {displayOriginData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition-opacity outline-none" style={{ cursor: 'pointer' }} />
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <g>
-                        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central">
-                          <tspan x="50%" dy="-0.5em" fontSize="10" fill="#94a3b8" fontWeight="bold">TOTAL</tspan>
-                          <tspan x="50%" dy="1.2em" fontSize="14" fill="#61072E" fontWeight="bold">
-                            {displayOriginData.reduce((acc, curr) => acc + curr.value, 0)}
-                          </tspan>
-                        </text>
-                      </g>
                       <Tooltip content={<CustomTooltip />} />
                       <Legend 
                         layout="horizontal" 
                         align="center" 
                         verticalAlign="bottom"
-                        wrapperStyle={{ paddingTop: '20px' }}
                         formatter={(value, entry: any) => {
                           const total = displayOriginData.reduce((acc, curr) => acc + curr.value, 0);
                           const val = entry.payload.value || 0;
                           const percent = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
-                          return <span className="text-slate-500 text-[9px] font-medium mr-2">{value} <span className="text-slate-900 font-bold">({val})</span></span>;
+                          return <span className="text-slate-500 text-[10px]">{value} ({percent}%)</span>;
                         }}
                       />
                     </PieChart>
