@@ -162,8 +162,31 @@ export function useInternoDashboard(filters: DashboardFilters) {
         const { data: milestonesData, error: milestonesError } = await milestonesQuery;
         if (milestonesError) throw milestonesError;
 
-        // PHASE 2: Deduplicate and build leads population
         const rawDataFromMilestones = milestonesData || [];
+
+        // PHASE 1.5: Final check for 'Ação de Marketing' in ANY milestone for these leads (Historical Exclusion)
+        const candidateLeadIds = Array.from(new Set(
+          rawDataFromMilestones.map(m => String(m.lead_id)).filter(id => id && id !== 'null' && id !== 'undefined')
+        ));
+
+        const excludedLeadIds = new Set<string>();
+        if (candidateLeadIds.length > 0) {
+          const chunkSize = 500;
+          for (let i = 0; i < candidateLeadIds.length; i += chunkSize) {
+            const chunk = candidateLeadIds.slice(i, i + chunkSize);
+            const { data: exclusionData } = await supabase
+              .from('lead_milestones')
+              .select('lead_id')
+              .or('status.ilike.%ação de marketing%,para_nome.ilike.%ação de marketing%,origem.ilike.%ação de marketing%,status.ilike.%acao de marketing%,para_nome.ilike.%acao de marketing%,origem.ilike.%acao de marketing%')
+              .in('lead_id', chunk);
+            
+            if (exclusionData) {
+              exclusionData.forEach(r => excludedLeadIds.add(String(r.lead_id)));
+            }
+          }
+        }
+
+        // PHASE 2: Deduplicate and build leads population
         
         // Sort to ensure we get a consistent view of the latest state if needed
         const sortedMilestones = [...rawDataFromMilestones].sort((a, b) => {
@@ -179,10 +202,10 @@ export function useInternoDashboard(filters: DashboardFilters) {
           const lid = String(item.lead_id);
           if (!lid || lid === 'null' || lid === 'undefined') continue;
 
-          // Exclusion rules based on keywords (as implied by previous turns but simplified)
+          // Historical exclusion check
+          if (excludedLeadIds.has(lid)) continue;
+
           const statusLower = String(item.status || item.para_nome || '').toLowerCase();
-          const origemLower = String(item.origem || '').toLowerCase();
-          if (statusLower.includes('ação de marketing') || statusLower.includes('acao de marketing') || origemLower.includes('ação de marketing')) continue;
 
           if (!seenLeads.has(lid)) {
              seenLeads.add(lid);
