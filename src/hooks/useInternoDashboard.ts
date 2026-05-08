@@ -517,10 +517,11 @@ export function useInternoDashboard(filters: DashboardFilters) {
     });
 
     const isAllowedVendaOrigin = (o: string) => {
-      return o.includes('facebook') || o.includes('fb') || o.includes('meta') ||
-             o.includes('insta') || o.includes('ig') || 
-             o.includes('site') || o.includes('orgânico') || o.includes('organico') || o.includes('seo') ||
-             o.includes('whatsapp') || o.includes('whats') || o.includes('wpp');
+      const low = (o || '').toLowerCase();
+      return low.includes('facebook') || low.includes('fb') || low.includes('meta') ||
+             low.includes('insta') || low.includes('ig') || 
+             low.includes('site') || low.includes('orgânico') || low.includes('organico') || low.includes('seo') ||
+             low.includes('whatsapp') || low.includes('whats') || low.includes('wpp');
     };
 
     let rCount = 0;
@@ -531,7 +532,15 @@ export function useInternoDashboard(filters: DashboardFilters) {
     const hottestLeadsList: any[] = [];
 
     leadsData.forEach(lead => {
-      const score = leadHottestStatus.get(String(lead.id)) || 0;
+      let score = leadHottestStatus.get(String(lead.id)) || 0;
+      
+      // Point-in-Time Score Adjustment: If status_atual (already adjusted for pit) says sale/etc, prioritize it
+      const st = (lead.status_atual || '').toLowerCase();
+      if (st.match(/venda|contrato|fechado/)) score = Math.max(score, 4);
+      else if (st.match(/proposta|negocia/)) score = Math.max(score, 3);
+      else if (st.match(/visita/)) score = Math.max(score, 2);
+      else if (st.match(/agendam|agendado/)) score = Math.max(score, 1);
+
       if (score >= 4) {
         if (isAllowedVendaOrigin(lead.origin_treated)) {
            rCount++;
