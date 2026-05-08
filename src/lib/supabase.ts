@@ -60,6 +60,7 @@ export const supabase = {
           ): Promise<TResult1 | TResult2> {
             return new Promise<any>(async (resolve, reject) => {
               try {
+                console.log(`[Supabase Mock] Fetching ${table}...`);
                 const response = await fetch('/api/query', {
                   method: 'POST',
                   headers: {
@@ -75,14 +76,16 @@ export const supabase = {
                   })
                 });
                 
-              if (!response.ok) {
+                if (!response.ok) {
                   const errorDetails = await response.text();
-                  console.error("ERRO EXATO DO BANCO:", errorDetails);
-                  throw new Error(`HTTP error! status: ${response.status} - Detalhes: ${errorDetails}`);
+                  console.error(`[Supabase Mock] ERRO NO FETCH ${table}:`, errorDetails);
+                  throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const result = await response.json();
+                console.log(`[Supabase Mock] Success ${table}:`, result.data?.length || 0, "rows");
                 resolve(result);
               } catch (error) {
+                console.error(`[Supabase Mock] Catch error ${table}:`, error);
                 resolve({ data: null, error });
               }
             }).then(onfulfilled, onrejected);
