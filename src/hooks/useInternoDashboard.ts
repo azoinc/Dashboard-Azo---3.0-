@@ -75,7 +75,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
         let endDate = new Date();
 
         if (filters.period === 'Todo o período') {
-          startDate = new Date(2010, 0, 1);
+          startDate = new Date(2026, 0, 1);
         } else if (filters.period === 'Últimos 30 dias') {
           startDate.setDate(now.getDate() - 30);
         } else if (filters.period === 'Este mês' || filters.period === 'Mês Atual') {
@@ -90,7 +90,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
           startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         }
 
-        const globalMinDate = new Date(2010, 0, 1);
+        const globalMinDate = new Date(2026, 0, 1);
         if (startDate < globalMinDate) startDate = globalMinDate;
 
         const formatYYYYMMDDEnd = (date: Date) => {
@@ -184,27 +184,33 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
         const excludedLeadIds = new Set<string>();
         if (candidateLeadIds.length > 0) {
-          const chunkSize = 1000; // Increased chunk size for parallel efficiency
-          const exclusionPromises = [];
+          const chunkSize = 2000; // Larger chunks for fewer total requests
+          const batches = [];
           for (let i = 0; i < candidateLeadIds.length; i += chunkSize) {
-            const chunk = candidateLeadIds.slice(i, i + chunkSize);
-            exclusionPromises.push(
-              supabase
-                .from('lead_milestones')
-                .select('lead_id')
-                .or('status.ilike.%ação de marketing%,para_nome.ilike.%ação de marketing%,origem.ilike.%ação de marketing%,status.ilike.%acao de marketing%,para_nome.ilike.%acao de marketing%,origem.ilike.%acao de marketing%')
-                .in('lead_id', chunk)
-                .limit(50000)
-            );
+            batches.push(candidateLeadIds.slice(i, i + chunkSize));
           }
-          
-          const exclusionResults = await Promise.all(exclusionPromises);
-          exclusionResults.forEach(res => {
-            if (res.data) {
-              res.data.forEach((r: any) => excludedLeadIds.add(String(r.lead_id)));
+
+          console.time('[ExclusionCheck]');
+          // Process sequentially or in very small parallel groups to avoid overloading the pooler
+          for (const chunk of batches) {
+            const { data: exclusionData, error: exclusionError } = await supabase
+              .from('lead_milestones')
+              .select('lead_id')
+              .or('para_nome.ilike.%ação%,para_nome.ilike.%marketing%,para_nome.ilike.%acao%')
+              .in('lead_id', chunk)
+              .limit(50000);
+            
+            if (exclusionError) {
+              console.error('[ExclusionCheck] Error:', exclusionError);
+              continue;
             }
-          });
-          console.log(`[Dashboard] Excluded ${excludedLeadIds.size} leads due to 'Ação de Marketing' status history`);
+
+            if (exclusionData) {
+              exclusionData.forEach(r => excludedLeadIds.add(String(r.lead_id)));
+            }
+          }
+          console.timeEnd('[ExclusionCheck]');
+          console.log(`[Dashboard] Excluded ${excludedLeadIds.size} leads out of ${candidateLeadIds.length} unique leads found in milestones`);
         }
 
         // PHASE 2: Deduplicate and build leads population
@@ -259,22 +265,32 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
         if (leadsData.length > 0) {
            const leadIds = leadsData.map(l => l.id);
-           const chunkSize = 1000;
-           const promises: Promise<any>[] = [];
-
+           const chunkSize = 1500;
+           const allResults: any[] = [];
+           
+           const batches = [];
            for (let i = 0; i < leadIds.length; i += chunkSize) {
-             const chunk = leadIds.slice(i, i + chunkSize);
-             
-             if (!hasSpecificCompetences) {
-               promises.push(supabase.from('view_funil_maximo_com_total').select('etapa_visual, lead_id').in('lead_id', chunk) as any);
-             }
-             
-             promises.push(supabase.from('view_lead_snapshot_mensal').select('status_final_mes, competencia_data, lead_id').in('lead_id', chunk) as any);
-             promises.push(supabase.from('view_tma_fila_atendimento').select('corretor, segundos_espera').in('lead_id', chunk) as any);
-             promises.push(supabase.from('view_esforco_corretor').select('corretor, lead_id').in('lead_id', chunk) as any);
+             batches.push(leadIds.slice(i, i + chunkSize));
            }
 
-           const resultsList = await Promise.all(promises);
+           console.time('[MetricsFetch]');
+           // Sequential processing for metrics to avoid pooler exhaust during high volume
+           for (const chunk of batches) {
+             const chunkPromises: Promise<any>[] = [];
+             
+             if (!hasSpecificCompetences) {
+               chunkPromises.push(supabase.from('view_funil_maximo_com_total').select('etapa_visual, lead_id').in('lead_id', chunk));
+             }
+             chunkPromises.push(supabase.from('view_lead_snapshot_mensal').select('status_final_mes, competencia_data, lead_id').in('lead_id', chunk));
+             chunkPromises.push(supabase.from('view_tma_fila_atendimento').select('corretor, segundos_espera').in('lead_id', chunk));
+             chunkPromises.push(supabase.from('view_esforco_corretor').select('corretor, lead_id').in('lead_id', chunk));
+
+             const resList = await Promise.all(chunkPromises);
+             allResults.push(...resList);
+           }
+           console.timeEnd('[MetricsFetch]');
+           
+           const resultsList = allResults;
            
            if (hasSpecificCompetences) {
              funnelRes = { data: syntheticFunnelData, error: null };
