@@ -17,7 +17,7 @@ export interface DashboardFilters {
   origin?: string;
   startDate?: string;
   endDate?: string;
-  competence?: string;
+  competences?: string[];
   city?: string;
   interactiveFilters?: {
     origin?: string;
@@ -50,7 +50,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
         period: filters.period,
         project: filters.project,
         broker: filters.broker,
-        competence: filters.competence,
+        competences: filters.competences,
         startDate: filters.startDate,
         endDate: filters.endDate,
         city: filters.city
@@ -124,15 +124,20 @@ export function useInternoDashboard(filters: DashboardFilters) {
         let leadsData: any[] | null = [];
         let syntheticFunnelData: any[] = [];
         
-        if (filters.competence && filters.competence !== 'Atual') {
-          // Calculate start and end date for the selected competence month
-          const compStartDate = new Date(filters.competence + "T00:00:00Z");
-          const compEndDate = new Date(compStartDate);
+        const hasSpecificCompetences = filters.competences && filters.competences.length > 0 && !filters.competences.includes('Atual');
+
+        if (hasSpecificCompetences) {
+          // Find min and max dates across selected competences
+          const dates = (filters.competences || []).map(c => new Date(c + "T00:00:00Z"));
+          const compStartDate = new Date(Math.min(...dates.map(d => d.getTime())));
+          const compEndDate = new Date(Math.max(...dates.map(d => d.getTime())));
           compEndDate.setMonth(compEndDate.getMonth() + 1);
           compEndDate.setDate(0); // Last day of the month
 
           const compStartStr = compStartDate.toISOString().split('T')[0];
           const compEndStr = compEndDate.toISOString().split('T')[0];
+          
+          const selectedMonthStrings = (filters.competences || []).map(c => c.substring(0, 7)); // YYYY-MM
 
           let snapshotQuery = supabase
             .from('lead_milestones')
@@ -167,10 +172,13 @@ export function useInternoDashboard(filters: DashboardFilters) {
               return (horaA > horaB) ? -1 : 1;
             });
 
-            // Deduplicate by lead_id (keep only the first one which is the latest)
+            // Deduplicate by lead_id (keep only the first one which is the latest in those months)
             const seenLeads = new Set();
             const deduplicated = [];
             for (const item of sortedData) {
+              const itemMonth = item.referencia_data.substring(0, 7);
+              if (!selectedMonthStrings.includes(itemMonth)) continue;
+              
               if (!seenLeads.has(item.lead_id)) {
                 seenLeads.add(item.lead_id);
                 const stAtual = item.status || item.para_nome || '';
@@ -294,7 +302,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
            
            const actionsResponses = res.slice(offset, offset + actionsPromises.length);
            
-           if (filters.competence && filters.competence !== 'Atual') {
+           if (hasSpecificCompetences) {
              funnelRes = {
                data: syntheticFunnelData,
                error: null
@@ -338,7 +346,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
     }
 
     fetchData();
-  }, [filters.period, filters.project, filters.broker, filters.competence, filters.startDate, filters.endDate, filters.city]); // Omit interactive filters to prevent refetching
+  }, [filters.period, filters.project, filters.broker, JSON.stringify(filters.competences), filters.startDate, filters.endDate, filters.city]); // Omit interactive filters to prevent refetching
 
   const computed = useMemo(() => {
     if (!rawData) {
@@ -482,7 +490,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
       .map(([name, dataSet]) => ({ name, value: dataSet.size }));
       
     const totalStage = funnelData.find((item: any) => item.name.includes('Total de Leads'));
-    const totalLeads = totalStage ? totalStage.value : leadsData.length;
+    const totalLeads = leadsData.length;
 
     const leadOriginMap = new Map<string, string>();
     let descartadosCount = 0;
@@ -545,6 +553,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
     const monthsSet = new Set<string>();
     const monthRawMap = new Map<string, string>();
 
+    const hasSpecificCompetences = filters.competences && filters.competences.length > 0 && !filters.competences.includes('Atual');
+    const selectedMonthStrings = hasSpecificCompetences ? (filters.competences || []).map(c => c.substring(0, 7)) : [];
+
     snapshotDataAll.forEach((row: any) => {
       if (!activeLeadIds.has(row.lead_id)) return; // FILTER BY ACTIVE LEADS
 
@@ -555,6 +566,11 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
       const compData = row.competencia_data;
       if (!compData) return;
+      
+      if (hasSpecificCompetences) {
+        const rawMonthStr = compData.substring(0, 7);
+        if (!selectedMonthStrings.includes(rawMonthStr)) return;
+      }
       
       let monthStr = compData;
       if (typeof compData === 'string' && compData.length >= 7) {
