@@ -114,8 +114,15 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
         const applyProjectFilter = (query: any) => {
           if (filters.project && filters.project !== 'Todos') {
-            // For exact matches from the dropdown, .eq is more reliable and indexed
-            return (query as any).eq('empreendimento', filters.project);
+            // Use ilike for more flexibility with names
+            const baseName = filters.project
+              .replace('Ar ', '')
+              .replace(' Home', '')
+              .replace(' Peninsula', '')
+              .replace(' Cambui', '')
+              .trim();
+            
+            return (query as any).or(`empreendimento.ilike.%${filters.project}%,empreendimento.ilike.%${baseName}%`);
           } else if (filters.city && filters.city !== 'ALL' && filters.city) {
              const cityProjects = PROJECTS_BY_CITY[filters.city as keyof typeof PROJECTS_BY_CITY];
              if (cityProjects && cityProjects.length > 0) {
@@ -412,7 +419,11 @@ export function useInternoDashboard(filters: DashboardFilters) {
     // but we apply client-side filtering as a secondary guarantee for consistency.
     if (filters.project && filters.project !== 'Todos') {
        const targetProj = filters.project.trim().toLowerCase();
-       leadsData = leadsData.filter(l => (l.empreendimento || '').trim().toLowerCase() === targetProj);
+       leadsData = leadsData.filter(l => {
+         const emp = (l.empreendimento || '').trim().toLowerCase();
+         // Attempt exact match first, then partial match to be flexible with "Ar Ipanema" vs "Ipanema" etc.
+         return emp === targetProj || emp.includes(targetProj) || targetProj.includes(emp);
+       });
     }
 
     if (activeFilter.origin) {
