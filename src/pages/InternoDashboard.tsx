@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, ArrowLeft, BarChart3, Users, Megaphone, Filter } from 'lucide-react';
+import { LogOut, ArrowLeft, BarChart3, Users, Megaphone, Filter, ChevronDown, Check } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, FunnelChart, Funnel, LabelList, Cell, PieChart, Pie
@@ -8,6 +8,66 @@ import {
 import { useInternoDashboard } from '../hooks/useInternoDashboard';
 import { DateRangePicker, DateRange } from '../components/DateRangePicker';
 import { PROJECTS_BY_CITY, ALL_PROJECTS } from '../types';
+
+const CompetenceMultiSelect = ({ options, selected, onChange }: { options: {label: string, value: string}[], selected: string[], onChange: (val: string[]) => void }) => {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+  
+  const toggle = (val: string) => {
+    if (val === 'Atual') {
+      onChange(['Atual']);
+      return;
+    }
+    let newSelected = selected.includes(val) ? selected.filter(s => s !== val) : [...selected, val];
+    if (newSelected.includes('Atual')) {
+       newSelected = newSelected.filter(s => s !== 'Atual');
+    }
+    if (newSelected.length === 0) newSelected = ['Atual'];
+    onChange(newSelected);
+  }
+
+  const label = selected.length === 1 && selected[0] === 'Atual' 
+    ? 'Atual (Tempo Real)' 
+    : `Competências (${selected.length})`;
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+       <button 
+         onClick={() => setOpen(!open)} 
+         className="flex items-center space-x-2 text-slate-900 text-sm focus:outline-none bg-transparent"
+       >
+          <span className="whitespace-nowrap">{label}</span>
+          <ChevronDown size={14} className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+       </button>
+       {open && (
+         <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto">
+            {options.map(opt => (
+              <div 
+                key={opt.value} 
+                onClick={() => toggle(opt.value)}
+                className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer flex items-center space-x-3 text-sm text-slate-700 transition-colors"
+              >
+                <div className={`w-4 h-4 min-w-[16px] rounded flex items-center justify-center transition-colors ${selected.includes(opt.value) ? 'bg-[#61072E] border-[#61072E]' : 'border border-slate-300'}`}>
+                  {selected.includes(opt.value) && <Check size={12} className="text-white" />}
+                </div>
+                <span>{opt.label}</span>
+              </div>
+            ))}
+         </div>
+       )}
+    </div>
+  )
+}
 
 interface Props {
   onBack: () => void;
@@ -217,9 +277,9 @@ export default function InternoDashboard({ onBack }: Props) {
     project: 'Todos', 
     broker: 'Todos',
     origin: 'Todas',
-    competence: 'Atual',
-    startDate: undefined,
-    endDate: undefined
+    competences: ['Atual'],
+    startDate: undefined as string | undefined,
+    endDate: undefined as string | undefined
   });
 
   const [interactiveFilters, setInteractiveFilters] = useState<{ origin?: string; cancelReason?: string; month?: string; status?: string; }>({});
@@ -248,7 +308,7 @@ export default function InternoDashboard({ onBack }: Props) {
   const displayDescartadosCountNum = hottestStatusData.descartado || 0;
   const displayDescartadosCount = displayDescartadosCountNum.toLocaleString('pt-BR');
   
-  const displayEmAtendimentoNum = displayTotalLeadsNum - displayDescartadosCountNum;
+  const displayEmAtendimentoNum = Math.max(0, displayTotalLeadsNum - displayDescartadosCountNum);
   const displayEmAtendimento = displayEmAtendimentoNum.toLocaleString('pt-BR');
   
   const displayAgendamentoCountNum = hottestStatusData.agendamento;
@@ -330,15 +390,11 @@ export default function InternoDashboard({ onBack }: Props) {
         />
 
         <div className="flex items-center space-x-2 text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-          <select 
-            className="bg-transparent border-none outline-none text-sm text-slate-900"
-            value={filters.competence}
-            onChange={(e) => setFilters({ ...filters, competence: e.target.value })}
-          >
-            {competenceOptions.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+          <CompetenceMultiSelect 
+            options={competenceOptions}
+            selected={filters.competences}
+            onChange={(vals) => setFilters({ ...filters, competences: vals })}
+          />
         </div>
 
         <div className="flex items-center space-x-2 text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
