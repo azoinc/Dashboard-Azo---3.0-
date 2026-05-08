@@ -62,12 +62,12 @@ export const INSTITUCIONAL_CATEGORIES: ExpenseCategory[] = [
 ];
 
 export type City = 'Rio de Janeiro' | 'Campinas';
-export type Project = 'Gávea' | 'Ipanema' | 'Insigna' | 'A Noite' | 'Ares' | 'Verter' | 'Casa da Mata' | 'Natus';
+export type Project = 'Gávea' | 'Ar Ipanema' | 'Insigna Peninsula' | 'A Noite' | 'Ares Home' | 'Verter Cambui' | 'Casa da Mata' | 'Natus';
 export type UserRole = 'MASTER' | 'DIRETORIA' | 'FUNCIONARIO_RJ' | 'FUNCIONARIO_CAMPINAS' | 'COMERCIAL_RJ' | 'COMERCIAL_CAMPINAS' | 'ADMINISTRATIVO';
 
 export const PROJECTS_BY_CITY: Record<City, Project[]> = {
-  'Rio de Janeiro': ['Gávea', 'Ipanema', 'Insigna', 'A Noite'],
-  'Campinas': ['Ares', 'Verter', 'Casa da Mata', 'Natus']
+  'Rio de Janeiro': ['Gávea', 'Ar Ipanema', 'Insigna Peninsula', 'A Noite'],
+  'Campinas': ['Ares Home', 'Verter Cambui', 'Casa da Mata', 'Natus']
 };
 
 export const ALL_PROJECTS = [...PROJECTS_BY_CITY['Rio de Janeiro'], ...PROJECTS_BY_CITY['Campinas']];
