@@ -5,6 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, FunnelChart, Funnel, LabelList, Cell, PieChart, Pie
 } from 'recharts';
+import { motion, AnimatePresence } from 'motion/react';
 import { useInternoDashboard } from '../hooks/useInternoDashboard';
 import { DateRangePicker, DateRange } from '../components/DateRangePicker';
 import { PROJECTS_BY_CITY, ALL_PROJECTS } from '../types';
@@ -229,62 +230,73 @@ const generateCompetenceOptions = () => {
 const competenceOptions = generateCompetenceOptions();
 
 const CustomFunnel = ({ data, total }: { data: any[], total: number }) => {
-  const colors = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#eab308', '#ec4899', '#f43f5e', '#84cc16'];
+  const colors = ['#61072E', '#8B1E3F', '#B53450', '#DF4B61', '#E86B7B', '#F18B95', '#FAABAF', '#FFCBCA'];
   
   if (!data || data.length === 0) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-slate-500">
+      <div className="w-full h-full flex items-center justify-center text-slate-500 italic">
         Nenhum dado encontrado para os filtros selecionados.
       </div>
     );
   }
 
   return (
-    <div className="relative w-full h-full flex items-center">
-      {/* Labels on the left */}
-      <div className="w-1/2 h-full flex flex-col justify-between py-4 z-10">
-        {data.map((item, idx) => {
-          const percentage = total > 0 ? ((item.value / total) * 100).toFixed(2) : '0.00';
-          return (
-            <div key={idx} className="flex items-center justify-end pr-4 relative h-full">
-              <span className="text-xs font-medium text-slate-600 whitespace-nowrap z-10 bg-white px-1">
-                {item.name} {item.value} ({percentage}%)
-              </span>
-              {/* Connecting line */}
-              <div className="absolute right-0 top-1/2 w-8 h-[1px] bg-slate-600 -mr-4"></div>
-            </div>
-          );
-        })}
-      </div>
-      
-      {/* Funnel SVG on the right */}
-      <div className="w-1/2 h-full py-4">
-        <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <div className="relative w-full h-full flex flex-col md:flex-row items-center justify-center p-2">
+      <div className="w-full md:w-[60%] h-full relative">
+        <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" className="overflow-visible">
+          <AnimatePresence mode="wait">
+            {data.map((item, idx) => {
+              const n = data.length;
+              const yTop = (idx / n) * 100;
+              const yBottom = ((idx + 1) / n) * 100;
+              
+              // Width goes from 90% at top to 20% at bottom
+              const wTop = 100 - (idx / n) * 70;
+              const wBottom = 100 - ((idx + 1) / n) * 70;
+              
+              const xTopLeft = (100 - wTop) / 2;
+              const xTopRight = 100 - xTopLeft;
+              const xBottomLeft = (100 - wBottom) / 2;
+              const xBottomRight = 100 - xBottomLeft;
+              
+              const points = `${xTopLeft},${yTop} ${xTopRight},${yTop} ${xBottomRight},${yBottom} ${xBottomLeft},${yBottom}`;
+              
+              return (
+                <motion.polygon
+                  key={`${item.name}-${idx}`}
+                  initial={{ opacity: 0, scaleY: 0, y: -20 }}
+                  animate={{ opacity: 1, scaleY: 1, y: 0 }}
+                  exit={{ opacity: 0, scaleY: 0 }}
+                  transition={{ duration: 0.5, delay: idx * 0.1, ease: [0.23, 1, 0.32, 1] }}
+                  points={points}
+                  fill={colors[idx % colors.length]}
+                  className="hover:brightness-110 transition-all cursor-default filter drop-shadow-sm"
+                  style={{ transformOrigin: 'top' }}
+                />
+              );
+            })}
+          </AnimatePresence>
+        </svg>
+
+        {/* Dynamic labels centered over the polygons */}
+        <div className="absolute inset-0 pointer-events-none flex flex-col">
           {data.map((item, idx) => {
-            const n = data.length;
-            const yTop = (idx / n) * 100;
-            const yBottom = ((idx + 1) / n) * 100;
-            
-            // Width goes from 100% at top to 10% at bottom
-            const wTop = 100 - (idx / n) * 90;
-            const wBottom = 100 - ((idx + 1) / n) * 90;
-            
-            const xTopLeft = (100 - wTop) / 2;
-            const xTopRight = 100 - xTopLeft;
-            const xBottomLeft = (100 - wBottom) / 2;
-            const xBottomRight = 100 - xBottomLeft;
-            
+            const percentage = total > 0 ? ((item.value / total) * 100).toFixed(1) : '0.0';
             return (
-              <polygon
-                key={idx}
-                points={`${xTopLeft},${yTop} ${xTopRight},${yTop} ${xBottomRight},${yBottom} ${xBottomLeft},${yBottom}`}
-                fill={colors[idx % colors.length]}
-                stroke="#ffffff"
-                strokeWidth="0.5"
-              />
+                <motion.div 
+                key={`label-${idx}`}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.6 + (idx * 0.1), type: 'spring', stiffness: 100 }}
+                className="flex-1 flex flex-col items-center justify-center text-white overflow-hidden px-2 text-center"
+                style={{ textShadow: '0 2px 4px rgba(0,0,0,0.4)' }}
+              >
+                <span className="text-[9px] font-bold uppercase tracking-tighter opacity-90 truncate w-full leading-tight">{item.name}</span>
+                <span className="text-sm font-black tracking-tight">{item.value} <span className="text-[10px] font-medium opacity-80">({percentage}%)</span></span>
+              </motion.div>
             );
           })}
-        </svg>
+        </div>
       </div>
     </div>
   );
@@ -645,14 +657,14 @@ export default function InternoDashboard({ onBack }: Props) {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-xl border border-slate-200">
                 <h3 className="text-sm font-medium text-slate-500 mb-4">Funil Status Atual</h3>
-                <div className="h-64">
+                <div className="h-96">
                   <CustomFunnel data={displayFunnelData} total={totalLeads || 1551} />
                 </div>
               </div>
 
               <div className="bg-white p-6 rounded-xl border border-slate-200">
                 <h3 className="text-sm font-medium text-slate-500 mb-4">Motivo Cancelamento</h3>
-                <div className="h-64">
+                <div className="h-96">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -663,7 +675,12 @@ export default function InternoDashboard({ onBack }: Props) {
                         cy="50%"
                         outerRadius={80}
                         innerRadius={50}
+                        paddingAngle={2}
                         fill="#8884d8"
+                        isAnimationActive={true}
+                        animationBegin={200}
+                        animationDuration={1200}
+                        animationEasing="ease-out"
                         onClick={(data: any) => setInteractiveFilters(prev => ({ ...prev, cancelReason: prev.cancelReason === data.reason ? undefined : data.reason }))}
                         className="cursor-pointer"
                         stroke="none"
@@ -671,18 +688,18 @@ export default function InternoDashboard({ onBack }: Props) {
                         label={({ cx, cy, midAngle, innerRadius, outerRadius, value, index }) => {
                           const total = displayCancelReasons.reduce((acc, curr) => acc + curr.count, 0);
                           const percent = (value / total) * 100;
-                          if (percent < 10) return null; // Don't show labels for small slices to avoid clutter
+                          if (percent < 12) return null; // Only labels for > 12%
                           const RADIAN = Math.PI / 180;
-                          const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                          const radius = outerRadius + 15;
                           const x = cx + radius * Math.cos(-midAngle * RADIAN);
                           const y = cy + radius * Math.sin(-midAngle * RADIAN);
                           return (
-                            <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight="bold">
+                            <text x={x} y={y} fill="#64748b" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={9} fontWeight="bold">
                               {percent.toFixed(0)}%
                             </text>
                           );
                         }}
-                        labelLine={false}
+                        labelLine={{ stroke: '#cbd5e1', strokeWidth: 1 }}
                       >
                         {displayCancelReasons.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition-opacity outline-none" style={{ cursor: 'pointer' }} />
@@ -698,14 +715,15 @@ export default function InternoDashboard({ onBack }: Props) {
                       </g>
                       <Tooltip content={<CustomTooltip />} />
                       <Legend 
-                        layout="vertical" 
-                        align="right" 
-                        verticalAlign="middle"
+                        layout="horizontal" 
+                        align="center" 
+                        verticalAlign="bottom"
+                        wrapperStyle={{ paddingTop: '20px' }}
                         formatter={(value, entry: any) => {
                           const total = displayCancelReasons.reduce((acc, curr) => acc + curr.count, 0);
                           const val = entry.payload.count || 0;
                           const percent = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
-                          return <span className="text-slate-600 text-[10px]">{value}: <strong>{val}</strong> ({percent}%)</span>;
+                          return <span className="text-slate-500 text-[9px] font-medium mr-2">{value} <span className="text-slate-900 font-bold">({val})</span></span>;
                         }}
                       />
                     </PieChart>
@@ -715,7 +733,7 @@ export default function InternoDashboard({ onBack }: Props) {
 
               <div className="bg-white p-6 rounded-xl border border-slate-200">
                 <h3 className="text-sm font-medium text-slate-500 mb-4">Origem</h3>
-                <div className="h-64">
+                <div className="h-96">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -726,7 +744,12 @@ export default function InternoDashboard({ onBack }: Props) {
                         cy="50%"
                         outerRadius={80}
                         innerRadius={50}
+                        paddingAngle={2}
                         fill="#8884d8"
+                        isAnimationActive={true}
+                        animationBegin={400}
+                        animationDuration={1200}
+                        animationEasing="ease-out"
                         onClick={(data: any) => setInteractiveFilters(prev => ({ ...prev, origin: prev.origin === data.name ? undefined : data.name }))}
                         className="cursor-pointer"
                         stroke="none"
@@ -734,18 +757,18 @@ export default function InternoDashboard({ onBack }: Props) {
                         label={({ cx, cy, midAngle, innerRadius, outerRadius, value, index }) => {
                           const total = displayOriginData.reduce((acc, curr) => acc + curr.value, 0);
                           const percent = (value / total) * 100;
-                          if (percent < 10) return null;
+                          if (percent < 12) return null;
                           const RADIAN = Math.PI / 180;
-                          const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                          const radius = outerRadius + 15;
                           const x = cx + radius * Math.cos(-midAngle * RADIAN);
                           const y = cy + radius * Math.sin(-midAngle * RADIAN);
                           return (
-                            <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={10} fontWeight="bold">
+                            <text x={x} y={y} fill="#64748b" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={9} fontWeight="bold">
                               {percent.toFixed(0)}%
                             </text>
                           );
                         }}
-                        labelLine={false}
+                        labelLine={{ stroke: '#cbd5e1', strokeWidth: 1 }}
                       >
                         {displayOriginData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} className="hover:opacity-80 transition-opacity outline-none" style={{ cursor: 'pointer' }} />
@@ -761,14 +784,15 @@ export default function InternoDashboard({ onBack }: Props) {
                       </g>
                       <Tooltip content={<CustomTooltip />} />
                       <Legend 
-                        layout="vertical" 
-                        align="right" 
-                        verticalAlign="middle"
+                        layout="horizontal" 
+                        align="center" 
+                        verticalAlign="bottom"
+                        wrapperStyle={{ paddingTop: '20px' }}
                         formatter={(value, entry: any) => {
                           const total = displayOriginData.reduce((acc, curr) => acc + curr.value, 0);
                           const val = entry.payload.value || 0;
                           const percent = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
-                          return <span className="text-slate-600 text-[10px]">{value}: <strong>{val}</strong> ({percent}%)</span>;
+                          return <span className="text-slate-500 text-[9px] font-medium mr-2">{value} <span className="text-slate-900 font-bold">({val})</span></span>;
                         }}
                       />
                     </PieChart>
