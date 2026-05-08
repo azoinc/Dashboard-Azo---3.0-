@@ -26,6 +26,15 @@ async function startServer() {
 
   app.use(express.json());
 
+  app.get("/api/health", async (req, res) => {
+    try {
+      const result = await pool.query('SELECT NOW()');
+      res.json({ status: "ok", db_time: result.rows[0].now });
+    } catch (error: any) {
+      res.status(500).json({ status: "error", message: error.message });
+    }
+  });
+
   // Generic query endpoint to replace Supabase client
   app.post("/api/query", async (req, res) => {
     try {
@@ -34,9 +43,21 @@ async function startServer() {
         return res.status(405).json({ error: 'Method Not Allowed' });
       }
 
+      // Log headers for debugging
+      // console.log("[Query API] Headers:", req.headers);
+      
       const { table, select, filters, inFilters, limit, order } = req.body;
       
-      let query = `SELECT ${select || '*'} FROM ${table} WHERE 1=1`;
+      if (!table) {
+        return res.status(400).json({ error: "Missing table name" });
+      }
+
+      console.log(`[Query API] Table: ${table}, Select: ${select}`);
+      console.log(`[Query API] Filters: ${JSON.stringify(filters)}`);
+      console.log(`[Query API] InFilters: ${JSON.stringify(inFilters)}`);
+
+      // Using double quotes for table names in case of special characters or reserved words
+      let query = `SELECT ${select || '*'} FROM "${table}" WHERE 1=1`;
       const values: any[] = [];
       let paramIndex = 1;
 
@@ -60,15 +81,24 @@ async function startServer() {
             values.push(value);
             paramIndex++;
           } else if (operator === 'or') {
-            // Simplified OR: expects a string like "col1.ilike.%val%,col2.eq.val"
-            // We'll support a very limited subset for now: col.ilike.%val% OR col.ilike.%val%
+            // Updated OR: support both ilike and eq
             const parts = value.split(',');
             const orClauses = parts.map((p: string) => {
-              const [col, op, val] = p.split('.');
+              const subParts = p.split('.');
+              if (subParts.length < 3) return '1=0';
+              
+              const col = subParts[0];
+              const op = subParts[1];
+              // Join the rest back in case the value contains dots
+              const val = subParts.slice(2).join('.');
+              
+              const placeholder = `$${paramIndex++}`;
               if (op === 'ilike') {
-                const placeholder = `$${paramIndex++}`;
-                values.push(val.replace(/\//g, '')); // basic cleanup
+                values.push(val.replace(/\//g, ''));
                 return `"${col}" ILIKE ${placeholder}`;
+              } else if (op === 'eq') {
+                values.push(val);
+                return `"${col}" = ${placeholder}`;
               }
               return '1=0';
             });
@@ -104,9 +134,12 @@ async function startServer() {
       }
 
       const result = await pool.query(query, values);
+      console.log(`[Query API] Result rows: ${result.rows.length}`);
       res.json({ data: result.rows, error: null });
     } catch (error: any) {
       console.error("Database query error:", error);
+      console.error("Query attempted:", query);
+      console.error("Values:", values);
       res.status(500).json({ data: null, error: { message: error.message } });
     }
   });
