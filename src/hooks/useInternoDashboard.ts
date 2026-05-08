@@ -136,10 +136,15 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
           let snapshotQuery = supabase
             .from('lead_milestones')
-            .select('lead_id, status, para_nome, lead_data_cad, origem, corretor, empreendimento, motivo_cancelamento, referencia_data, hora_referencia_data')
+            .select('lead_id, lead_nome, status, para_nome, lead_data_cad, origem, corretor, empreendimento, motivo_cancelamento, referencia_data, hora_referencia_data')
             .gte('referencia_data', compStartStr)
             .lte('referencia_data', compEndStr);
             
+          // The primary date period selector validates the create date of the lead
+          const startDateSimple = formatYYYYMMDDStart(startDate).split('T')[0];
+          const endDateSimple = formatYYYYMMDDEnd(endDate).split('T')[0];
+          snapshotQuery = (snapshotQuery as any).gte('lead_data_cad', startDateSimple).lte('lead_data_cad', endDateSimple);
+          
           snapshotQuery = applyProjectFilter(snapshotQuery);
           if (filters.broker !== 'Todos') {
             snapshotQuery = (snapshotQuery as any).ilike('corretor', `%${filters.broker}%`);
@@ -172,6 +177,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
                 deduplicated.push({
                   status_atual: stAtual,
                   id: item.lead_id,
+                  nome: item.lead_nome,
                   lead_data_cad: item.lead_data_cad,
                   origem: item.origem,
                   motivo_cancelamento: item.motivo_cancelamento || null,
@@ -205,7 +211,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
         } else {
           let leadsQuery = supabase
             .from('leads')
-            .select('status_atual, id_cv, data_criacao_cv, origem, motivo_cancelamento, corretor, empreendimento')
+            .select('status_atual, nome, id_cv, data_criacao_cv, origem, motivo_cancelamento, corretor, empreendimento')
             .gte('data_criacao_cv', startDateStr)
             .lte('data_criacao_cv', endDateStr);
 
@@ -220,6 +226,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
           leadsData = data?.map((item: any) => ({
             status_atual: item.status_atual,
             id: item.id_cv,
+            nome: item.nome,
             lead_data_cad: item.data_criacao_cv,
             origem: item.origem,
             motivo_cancelamento: item.motivo_cancelamento,
@@ -339,7 +346,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
         statusData: [], funnelData: [], stackedStatusData: [], availableMonths: [],
         brokerTimeData: [], brokerActionsData: [], originData: [], cancelReasons: [],
         brokerLeads: [], lineData: [], lineChartKeys: [], totalLeads: 0,
-        hottestStatusData: { visita: 0, agendamento: 0, proposta: 0, venda: 0 }
+        hottestStatusData: { visita: 0, agendamento: 0, proposta: 0, venda: 0 },
+        hottestLeadsList: []
       };
     }
     
@@ -496,17 +504,38 @@ export function useInternoDashboard(filters: DashboardFilters) {
     let pCount = 0;
     let vCount = 0;
     let aCount = 0;
-    leadHottestStatus.forEach((score, leadId) => {
+    
+    const hottestLeadsList: any[] = [];
+
+    leadsData.forEach(lead => {
+      const score = leadHottestStatus.get(lead.id) || 0;
       if (score >= 4) {
-        const origin = leadOriginMap.get(leadId) || '';
-        if (isAllowedVendaOrigin(origin)) {
+        if (isAllowedVendaOrigin(lead.origin_treated)) {
            rCount++;
         }
       }
       if (score >= 3) pCount++;
       if (score >= 2) vCount++;
       if (score >= 1) aCount++;
+      
+      if (score >= 1) {
+        let maxStep = 'Agendamento';
+        if (score === 2) maxStep = 'Visita';
+        if (score === 3) maxStep = 'Proposta';
+        if (score === 4) maxStep = 'Venda';
+        
+        hottestLeadsList.push({
+          id: lead.id,
+          nome: lead.nome || 'Sem Nome',
+          empreendimento: lead.empreendimento,
+          corretor: lead.corretor,
+          maxStep,
+          data_entrada: lead.lead_data_cad,
+          status_atual: lead.status_atual
+        });
+      }
     });
+
     const hottestStatusData = { visita: vCount, agendamento: aCount, proposta: pCount, venda: rCount, descartado: descartadosCount };
 
 
@@ -591,7 +620,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
       statusData, funnelData, stackedStatusData, availableMonths,
       brokerTimeData, brokerActionsData, originData, cancelReasons,
       brokerLeads, lineData: sortedLineData, lineChartKeys, totalLeads,
-      hottestStatusData
+      hottestStatusData, hottestLeadsList
     };
   }, [rawData, filters.interactiveFilters]);
 
