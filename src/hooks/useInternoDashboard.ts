@@ -109,6 +109,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
         const startDateStr = formatYYYYMMDDStart(startDate);
         const endDateStr = formatYYYYMMDDEnd(endDate);
 
+        const isTodoPeriodo = filters.period === 'Todo o período';
+
         const applyProjectFilter = (query: any) => {
           if (filters.project !== 'Todos') {
             return (query as any).ilike('empreendimento', `%${filters.project}%`);
@@ -146,9 +148,11 @@ export function useInternoDashboard(filters: DashboardFilters) {
             .lte('referencia_data', compEndStr);
             
           // The primary date period selector validates the create date of the lead
-          const startDateSimple = formatYYYYMMDDStart(startDate).split('T')[0];
-          const endDateSimple = formatYYYYMMDDEnd(endDate).split('T')[0];
-          snapshotQuery = (snapshotQuery as any).gte('lead_data_cad', startDateSimple).lte('lead_data_cad', endDateSimple);
+          if (!isTodoPeriodo) {
+            const startDateSimple = startDateStr.split('T')[0];
+            const endDateSimple = endDateStr.split('T')[0];
+            snapshotQuery = (snapshotQuery as any).gte('lead_data_cad', startDateSimple).lte('lead_data_cad', endDateSimple);
+          }
           
           snapshotQuery = applyProjectFilter(snapshotQuery);
           if (filters.broker !== 'Todos') {
@@ -176,10 +180,11 @@ export function useInternoDashboard(filters: DashboardFilters) {
         }
 
         // --- Gather all candidate IDs to fetch exclusions ---
+        // For exclusion, we must check if "Ação de Marketing" ever appeared in milestones
         const candidateLeadIds = Array.from(new Set([
-          ...rawSnapshotData.map((r: any) => r.lead_id),
-          ...rawLeadsData.map((r: any) => r.id_cv)
-        ])).filter(id => id != null);
+          ...rawSnapshotData.map((r: any) => String(r.lead_id)),
+          ...rawLeadsData.map((r: any) => String(r.id_cv))
+        ])).filter(id => id != null && id !== 'undefined');
 
         const excludedLeadIds = new Set<string>();
 
@@ -225,8 +230,10 @@ export function useInternoDashboard(filters: DashboardFilters) {
                 }
 
                 if (isExcluded) {
-                  if (r.lead_id) excludedLeadIds.add(String(r.lead_id));
-                  if (r.id_cv) excludedLeadIds.add(String(r.id_cv));
+                  const id = String(r.lead_id || r.id_cv);
+                  if (id && id !== 'undefined' && id !== 'null') {
+                    excludedLeadIds.add(id);
+                  }
                 }
               });
             }
