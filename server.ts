@@ -10,11 +10,11 @@ const { Pool } = pg;
 
 // Prioritize environment variables, fallback to provided credentials if needed
 const pool = new Pool({
-  host: process.env.SP_HOST || "aws-1-sa-east-1.pooler.supabase.com",
+  host: process.env.SP_HOST,
   database: "postgres",
-  user: process.env.SP_USER || "postgres.gmvmdryoisurvhtdrppb",
-  password: process.env.SP_PS || "Azo@2025#Inc",
-  port: Number(process.env.SP_PORT) || 6543,
+  user: process.env.SP_USER,
+  password: process.env.SP_PS,
+  port: Number(process.env.SP_PORT),
   ssl: {
     rejectUnauthorized: false
   }
