@@ -230,11 +230,24 @@ export function useInternoDashboard(filters: DashboardFilters) {
             empreendimento: latest.empreendimento
           });
 
-          // Build synthetic funnel based on full history
+          // Build synthetic funnel based on history up to the selected period
           const reachedStages = new Set<string>();
           reachedStages.add('1. Total de Leads');
           
+          // Determine the end date of the selected competencies to cap history
+          let capDate = '9999-12-31';
+          if (hasSpecificCompetences) {
+            const dates = (filters.competences || []).map(c => new Date(c + "T00:00:00Z"));
+            const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+            maxDate.setMonth(maxDate.getMonth() + 1);
+            maxDate.setDate(0); 
+            capDate = maxDate.toISOString().split('T')[0];
+          }
+
           history.forEach(item => {
+             const refDate = item.referencia_data || '';
+             if (refDate > capDate) return; // Point-in-time cap
+
              const st = (item.status || item.para_nome || '').toLowerCase();
              // (Historical marketing exclusion is already handled above for the whole lead)
 
@@ -343,7 +356,33 @@ export function useInternoDashboard(filters: DashboardFilters) {
       };
     }
     
+    // Check if competences (timestamps) are active
+    const hasSpecificCompetences = filters.competences && filters.competences.length > 0 && !filters.competences.includes('Atual');
+
     let leadsData = rawData.leadsData as any[];
+
+    // Point-in-time logic: If competence (timestamp) is selected, use status from end-of-month snapshot
+    if (hasSpecificCompetences) {
+        const selectedMonths = (filters.competences || []).map(c => c.substring(0, 7)).sort();
+        const latestMonth = selectedMonths[selectedMonths.length - 1]; // Use the most recent selected month as the point-in-time reference
+
+        const snapshotDataAll = rawData.snapshotRes.flatMap((res: any) => res.data || []);
+        const pitStatusMap = new Map<string, string>();
+        
+        snapshotDataAll.forEach((row: any) => {
+           if (row.competencia_data?.startsWith(latestMonth)) {
+             pitStatusMap.set(String(row.lead_id), row.status_final_mes);
+           }
+        });
+
+        leadsData = leadsData.map(l => {
+           const pitStatus = pitStatusMap.get(String(l.id));
+           // If we have a snapshot for that month, use it. 
+           // If not, it means the lead might not have existed yet or was already finished/excluded in a way that left no snapshot.
+           // However, if they entered in Jan and we view Jan, there should be a snapshot.
+           return { ...l, status_atual: pitStatus || l.status_atual };
+        });
+    }
 
     // Optional: Filter out 'Ação de Marketing' row from final counts if needed
     leadsData = leadsData.map(lead => {
@@ -538,7 +577,6 @@ export function useInternoDashboard(filters: DashboardFilters) {
     const monthsSet = new Set<string>();
     const monthRawMap = new Map<string, string>();
 
-    const hasSpecificCompetences = filters.competences && filters.competences.length > 0 && !filters.competences.includes('Atual');
     const selectedMonthStrings = hasSpecificCompetences ? (filters.competences || []).map(c => c.substring(0, 7)) : [];
 
     snapshotDataAll.forEach((row: any) => {
