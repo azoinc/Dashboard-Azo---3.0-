@@ -287,12 +287,10 @@ export function useInternoDashboard(filters: DashboardFilters) {
              
              if (!hasSpecificCompetences) {
                let q = supabase.from('view_funil_maximo_com_total').select('etapa_visual, lead_id').in('lead_id', chunk);
-               q = applyProjectFilter(q);
                chunkPromises.push(q as any);
              }
              
              let sq = supabase.from('view_lead_snapshot_mensal').select('status_final_mes, competencia_data, lead_id').in('lead_id', chunk);
-             sq = applyProjectFilter(sq);
              chunkPromises.push(sq as any);
 
              // TMA and esforço normally follow the broker but we can add project filter if column exists
@@ -410,15 +408,25 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
     const activeFilter = filters.interactiveFilters || {};
     
+    // Server-side filtering is applied to lead_milestones, 
+    // but we apply client-side filtering as a secondary guarantee for consistency.
+    if (filters.project && filters.project !== 'Todos') {
+       const targetProj = filters.project.trim().toLowerCase();
+       leadsData = leadsData.filter(l => (l.empreendimento || '').trim().toLowerCase() === targetProj);
+    }
+
     if (activeFilter.origin) {
-       leadsData = leadsData.filter(l => l.origin_treated === activeFilter.origin);
+       const targetOrigin = activeFilter.origin.trim().toLowerCase();
+       leadsData = leadsData.filter(l => l.origin_treated.trim().toLowerCase() === targetOrigin);
     }
     if (activeFilter.cancelReason) {
-       leadsData = leadsData.filter(l => l.motivo_cancelamento_treated === activeFilter.cancelReason);
+       const targetReason = activeFilter.cancelReason.trim().toLowerCase();
+       leadsData = leadsData.filter(l => (l.motivo_cancelamento_treated || '').trim().toLowerCase() === targetReason);
     }
 
     if (filters.origin && filters.origin !== 'Todas') {
-       leadsData = leadsData.filter(l => l.origin_treated === filters.origin);
+       const targetOrigin = filters.origin.trim().toLowerCase();
+       leadsData = leadsData.filter(l => l.origin_treated.trim().toLowerCase() === targetOrigin);
     }
     
     // Create an set of active lead IDs
