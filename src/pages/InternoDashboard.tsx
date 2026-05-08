@@ -562,7 +562,16 @@ export default function InternoDashboard({ onBack }: Props) {
                     <XAxis dataKey="status" stroke="#94a3b8" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={80} interval={0} />
                     <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: '12px', color: '#94a3b8' }} verticalAlign="top" height={36} />
+                    <Legend 
+                      verticalAlign="top" 
+                      height={36}
+                      formatter={(value, entry: any) => {
+                        const { payload } = entry;
+                        // For stacked bars, payload is the category data across series.
+                        // This is tricky for Legend. Let's just keep the month name but polished.
+                        return <span className="text-slate-600 text-xs font-medium">{value}</span>;
+                      }}
+                    />
                     {displayAvailableMonths.map((month, idx) => (
                       <Bar 
                         key={month} 
@@ -615,6 +624,17 @@ export default function InternoDashboard({ onBack }: Props) {
                         ))}
                       </Pie>
                       <Tooltip content={<CustomTooltip />} />
+                      <Legend 
+                        layout="vertical" 
+                        align="right" 
+                        verticalAlign="middle"
+                        formatter={(value, entry: any) => {
+                          const total = displayCancelReasons.reduce((acc, curr) => acc + curr.count, 0);
+                          const val = entry.payload.count || 0;
+                          const percent = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
+                          return <span className="text-slate-600 text-[10px]">{value}: <strong>{val}</strong> ({percent}%)</span>;
+                        }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -643,6 +663,17 @@ export default function InternoDashboard({ onBack }: Props) {
                         ))}
                       </Pie>
                       <Tooltip content={<CustomTooltip />} />
+                      <Legend 
+                        layout="vertical" 
+                        align="right" 
+                        verticalAlign="middle"
+                        formatter={(value, entry: any) => {
+                          const total = displayOriginData.reduce((acc, curr) => acc + curr.value, 0);
+                          const val = entry.payload.value || 0;
+                          const percent = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
+                          return <span className="text-slate-600 text-[10px]">{value}: <strong>{val}</strong> ({percent}%)</span>;
+                        }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -652,14 +683,22 @@ export default function InternoDashboard({ onBack }: Props) {
             {/* Line Chart Row */}
             <div className="bg-white p-6 rounded-xl border border-slate-200">
               <h3 className="text-sm font-medium text-slate-500 mb-4">Evolução de Leads por Empreendimento</h3>
-              <div className="h-64">
+              <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={displayLineData}>
+                    <LineChart data={displayLineData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                       <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                       <Tooltip content={<CustomTooltip />} />
-                      <Legend wrapperStyle={{ fontSize: '12px', color: '#94a3b8' }} />
+                      <Legend 
+                        verticalAlign="top" 
+                        height={40}
+                        formatter={(value) => {
+                          // Find total for this project across all line data
+                          const total = displayLineData.reduce((acc, curr) => acc + (curr[value] || 0), 0);
+                          return <span className="text-slate-600 text-xs font-medium">{value} ({total})</span>;
+                        }}
+                      />
                       {displayLineChartKeys.map((key, idx) => (
                         <Line 
                           key={key}
