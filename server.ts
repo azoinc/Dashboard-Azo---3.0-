@@ -131,11 +131,13 @@ async function startServer() {
         values.push(limit);
         paramIndex++;
       } else {
-        query += ` LIMIT 10000`; // Default limit for safety
+        query += ` LIMIT 50000`; // Default limit for safety
       }
 
+      const startTime = Date.now();
       const result = await pool.query(query, values);
-      console.log(`[Query API] Result rows: ${result.rows.length}`);
+      const duration = Date.now() - startTime;
+      console.log(`[Query API] Table: ${table}, Rows: ${result.rows.length}, Duration: ${duration}ms`);
       res.json({ data: result.rows, error: null });
     } catch (error: any) {
       console.error("Database query error:", error);
