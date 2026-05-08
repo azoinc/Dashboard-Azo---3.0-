@@ -125,6 +125,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
         let syntheticFunnelData: any[] = [];
         
         const hasSpecificCompetences = filters.competences && filters.competences.length > 0 && !filters.competences.includes('Atual');
+        let rawSnapshotData: any[] = [];
+        let rawLeadsData: any[] = [];
 
         if (hasSpecificCompetences) {
           // Find min and max dates across selected competences
@@ -137,8 +139,6 @@ export function useInternoDashboard(filters: DashboardFilters) {
           const compStartStr = compStartDate.toISOString().split('T')[0];
           const compEndStr = compEndDate.toISOString().split('T')[0];
           
-          const selectedMonthStrings = (filters.competences || []).map(c => c.substring(0, 7)); // YYYY-MM
-
           let snapshotQuery = supabase
             .from('lead_milestones')
             .select('lead_id, lead_nome, status, para_nome, lead_data_cad, origem, corretor, empreendimento, motivo_cancelamento, referencia_data, hora_referencia_data')
@@ -156,66 +156,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
           }
 
           const { data, error } = await snapshotQuery;
-          if (error) {
-            console.error('Snapshot query error:', error);
-            throw error;
-          }
-          
-          if (data) {
-            // Sort by data and hora descending to get the latest milestone first
-            const sortedData = data.sort((a: any, b: any) => {
-              if (a.referencia_data !== b.referencia_data) {
-                return (a.referencia_data > b.referencia_data) ? -1 : 1;
-              }
-              const horaA = a.hora_referencia_data || '00:00:00';
-              const horaB = b.hora_referencia_data || '00:00:00';
-              return (horaA > horaB) ? -1 : 1;
-            });
-
-            // Deduplicate by lead_id (keep only the first one which is the latest in those months)
-            const seenLeads = new Set();
-            const deduplicated = [];
-            for (const item of sortedData) {
-              const itemMonth = item.referencia_data.substring(0, 7);
-              if (!selectedMonthStrings.includes(itemMonth)) continue;
-              
-              if (!seenLeads.has(item.lead_id)) {
-                seenLeads.add(item.lead_id);
-                const stAtual = item.status || item.para_nome || '';
-                deduplicated.push({
-                  status_atual: stAtual,
-                  id: item.lead_id,
-                  nome: item.lead_nome,
-                  lead_data_cad: item.lead_data_cad,
-                  origem: item.origem,
-                  motivo_cancelamento: item.motivo_cancelamento || null,
-                  corretor: item.corretor,
-                  empreendimento: item.empreendimento
-                });
-                
-                // Map to synthetic funnel steps
-                syntheticFunnelData.push({ lead_id: item.lead_id, etapa_visual: '1. Total de Leads' });
-                
-                const st = String(stAtual).toLowerCase();
-                if (!st.includes('aguardando')) {
-                  syntheticFunnelData.push({ lead_id: item.lead_id, etapa_visual: '2. Em Atendimento' });
-                }
-                if (st.includes('agendam') || st.includes('agendado') || st.includes('visita') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
-                  syntheticFunnelData.push({ lead_id: item.lead_id, etapa_visual: '3. Agendamento' });
-                }
-                if (st.includes('visita') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
-                  syntheticFunnelData.push({ lead_id: item.lead_id, etapa_visual: '4. Visita' });
-                }
-                if (st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
-                  syntheticFunnelData.push({ lead_id: item.lead_id, etapa_visual: '5. Proposta/Negociação' });
-                }
-                if (st.includes('venda') || st.includes('contrato')) {
-                  syntheticFunnelData.push({ lead_id: item.lead_id, etapa_visual: '6. Vendas' });
-                }
-              }
-            }
-            leadsData = deduplicated;
-          }
+          if (error) throw error;
+          if (data) rawSnapshotData = data;
         } else {
           let leadsQuery = supabase
             .from('leads')
@@ -230,17 +172,120 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
           const { data, error } = await leadsQuery;
           if (error) throw error;
-          
-          leadsData = data?.map((item: any) => ({
-            status_atual: item.status_atual,
-            id: item.id_cv,
-            nome: item.nome,
-            lead_data_cad: item.data_criacao_cv,
-            origem: item.origem,
-            motivo_cancelamento: item.motivo_cancelamento,
-            corretor: item.corretor,
-            empreendimento: item.empreendimento
-          })) || [];
+          if (data) rawLeadsData = data;
+        }
+
+        // --- Gather all candidate IDs to fetch exclusions ---
+        const candidateLeadIds = Array.from(new Set([
+          ...rawSnapshotData.map((r: any) => r.lead_id),
+          ...rawLeadsData.map((r: any) => r.id_cv)
+        ]));
+
+        const excludedLeadIds = new Set<string>();
+
+        if (candidateLeadIds.length > 0) {
+          const chunkSize = 1000;
+          const exclusionPromises = [];
+          for (let i = 0; i < candidateLeadIds.length; i += chunkSize) {
+             const chunk = candidateLeadIds.slice(i, i + chunkSize);
+             exclusionPromises.push(
+               supabase
+                 .from('lead_milestones')
+                 .select('lead_id')
+                 .in('lead_id', chunk)
+                 .or('para_nome.ilike.%acao%,para_nome.ilike.%ação%,status.ilike.%acao%,status.ilike.%ação%')
+             );
+             exclusionPromises.push(
+               supabase
+                 .from('leads')
+                 .select('id_cv')
+                 .in('id_cv', chunk)
+                 .or('status_atual.ilike.%acao%,status_atual.ilike.%ação%,motivo_cancelamento.ilike.%acao%,motivo_cancelamento.ilike.%ação%,origem.ilike.%acao%,origem.ilike.%ação%')
+             );
+          }
+          const exclusionRes = await Promise.all(exclusionPromises);
+          exclusionRes.forEach(res => {
+            if (res.data) {
+              res.data.forEach((r: any) => {
+                if (r.lead_id) excludedLeadIds.add(String(r.lead_id));
+                if (r.id_cv) excludedLeadIds.add(String(r.id_cv));
+              });
+            }
+          });
+        }
+
+        // --- Now process and filter the data ---
+        if (hasSpecificCompetences) {
+           const selectedMonthStrings = (filters.competences || []).map(c => c.substring(0, 7)); // YYYY-MM
+           
+           const sortedData = rawSnapshotData.sort((a: any, b: any) => {
+             if (a.referencia_data !== b.referencia_data) {
+               return (a.referencia_data > b.referencia_data) ? -1 : 1;
+             }
+             const horaA = a.hora_referencia_data || '00:00:00';
+             const horaB = b.hora_referencia_data || '00:00:00';
+             return (horaA > horaB) ? -1 : 1;
+           });
+
+           const seenLeads = new Set();
+           const deduplicated = [];
+           for (const item of sortedData) {
+             const itemMonth = item.referencia_data.substring(0, 7);
+             if (!selectedMonthStrings.includes(itemMonth)) continue;
+             
+             const stringLeadId = String(item.lead_id);
+             
+             if (!seenLeads.has(stringLeadId)) {
+               seenLeads.add(stringLeadId);
+               
+               if (excludedLeadIds.has(stringLeadId)) continue;
+
+               const stAtual = item.status || item.para_nome || '';
+               const st = String(stAtual).toLowerCase();
+               if (st.includes('ação') || st.includes('acao')) continue; 
+
+               deduplicated.push({
+                 status_atual: stAtual,
+                 id: stringLeadId,
+                 nome: item.lead_nome,
+                 lead_data_cad: item.lead_data_cad,
+                 origem: item.origem,
+                 motivo_cancelamento: item.motivo_cancelamento || null,
+                 corretor: item.corretor,
+                 empreendimento: item.empreendimento
+               });
+               
+               syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '1. Total de Leads' });
+               
+               if (!st.includes('aguardando')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '2. Em Atendimento' });
+               }
+               if (st.includes('agendam') || st.includes('agendado') || st.includes('visita') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '3. Agendamento' });
+               }
+               if (st.includes('visita') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '4. Visita' });
+               }
+               if (st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '5. Proposta/Negociação' });
+               }
+               if (st.includes('venda') || st.includes('contrato')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '6. Vendas' });
+               }
+             }
+           }
+           leadsData = deduplicated;
+        } else {
+           leadsData = rawLeadsData.filter((item: any) => !excludedLeadIds.has(String(item.id_cv))).map((item: any) => ({
+             status_atual: item.status_atual,
+             id: String(item.id_cv),
+             nome: item.nome,
+             lead_data_cad: item.data_criacao_cv,
+             origem: item.origem,
+             motivo_cancelamento: item.motivo_cancelamento,
+             corretor: item.corretor,
+             empreendimento: item.empreendimento
+           }));
         }
 
         let funnelRes = { data: [] as any[], error: null };
@@ -360,6 +405,12 @@ export function useInternoDashboard(filters: DashboardFilters) {
     }
     
     let leadsData = rawData.leadsData as any[];
+
+    // Exclude 'Ação de Marketing' entirely from the dashboard metrics
+    leadsData = leadsData.filter(l => {
+      const status = (l.status_atual || '').toLowerCase();
+      return !status.includes('ação') && !status.includes('acao');
+    });
     
     // Treat origins beforehand so we can filter by the treated name!
     leadsData = leadsData.map(lead => {
