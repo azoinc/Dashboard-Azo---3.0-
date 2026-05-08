@@ -198,19 +198,19 @@ export function useInternoDashboard(filters: DashboardFilters) {
           for (let i = 0; i < candidateLeadIds.length; i += chunkSize) {
              const chunk = candidateLeadIds.slice(i, i + chunkSize);
              
-             // Optimized exclusion query: only fetching IDs that match exclusion criteria
+             // Optimized exclusion query: matching specific strings to avoid filtering valid leads like 'Ligação' or 'Negociação'
              exclusionPromises.push(
                supabase
                  .from('lead_milestones')
                  .select('lead_id')
-                 .or('para_nome.ilike.%ação%,para_nome.ilike.%acao%,status.ilike.%ação%,status.ilike.%acao%')
+                 .or('para_nome.ilike.%Ação de Marketing%,status.ilike.%Ação de Marketing%')
                  .in('lead_id', chunk)
              );
              exclusionPromises.push(
                supabase
                  .from('leads')
                  .select('id_cv')
-                 .or('status_atual.ilike.%ação%,status_atual.ilike.%acao%,motivo_cancelamento.ilike.%ação%,motivo_cancelamento.ilike.%acao%,origem.ilike.%ação%,origem.ilike.%acao%')
+                 .or('status_atual.ilike.%Ação de Marketing%,motivo_cancelamento.ilike.%Ação de Marketing%,origem.ilike.%Ação de Marketing%')
                  .in('id_cv', chunk)
              );
           }
@@ -258,7 +258,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
                const stAtual = item.status || item.para_nome || '';
                const st = String(stAtual).toLowerCase();
-               if (st.includes('ação') || st.includes('acao')) continue; 
+               if (st === 'ação de marketing' || st === 'acao de marketing') continue; 
 
                deduplicated.push({
                  status_atual: stAtual,
@@ -425,7 +425,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
     // Exclude 'Ação de Marketing' entirely from the dashboard metrics
     leadsData = leadsData.filter(l => {
       const status = (l.status_atual || '').toLowerCase();
-      return !status.includes('ação') && !status.includes('acao');
+      return status !== 'ação de marketing' && status !== 'acao de marketing';
     });
     
     // Treat origins beforehand so we can filter by the treated name!
@@ -532,7 +532,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
         
         const etapa = row.etapa_visual;
         if (etapa && leadId && leadId !== 'null' && leadId !== 'undefined') {
-          if (etapa.toLowerCase().includes('ação') || etapa.toLowerCase().includes('acao')) return;
+          const etapaLower = etapa.toLowerCase();
+          if (etapaLower === 'ação de marketing' || etapaLower === 'acao de marketing') return;
 
           if (!funnelCounts[etapa]) funnelCounts[etapa] = new Set();
           funnelCounts[etapa].add(leadId);
@@ -628,7 +629,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
       if (!activeLeadIds.has(stringifiedLeadId)) return; // FILTER BY ACTIVE LEADS
 
       const status = row.status_final_mes || 'Sem Status';
-      if (status.toLowerCase().includes('ação') || status.toLowerCase().includes('acao')) return; // exclude
+      const statusLower = status.toLowerCase();
+      if (statusLower === 'ação de marketing' || statusLower === 'acao de marketing') return; // exclude
       
       if (activeFilter.status && status !== activeFilter.status) return; // INTERACTIVE STATUS FILTER
 
