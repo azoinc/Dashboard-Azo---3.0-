@@ -461,7 +461,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
     }
     
     // Create an set of active lead IDs
-    const activeLeadIds = new Set(leadsData.map(l => l.id));
+    const activeLeadIds = new Set(leadsData.map(l => String(l.id)));
 
     const statusCounts: Record<string, number> = {};
     const originCounts: Record<string, number> = {};
@@ -530,11 +530,11 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
     if (!rawData.funnelRes.error && rawData.funnelRes.data) {
       rawData.funnelRes.data.forEach((row: any) => {
-        const leadId = row.lead_id;
+        const leadId = String(row.lead_id);
         if (!activeLeadIds.has(leadId)) return; // FILTER BY ACTIVE LEADS
         
         const etapa = row.etapa_visual;
-        if (etapa && leadId) {
+        if (etapa && leadId && leadId !== 'null' && leadId !== 'undefined') {
           if (etapa.toLowerCase().includes('ação') || etapa.toLowerCase().includes('acao')) return;
 
           if (!funnelCounts[etapa]) funnelCounts[etapa] = new Set();
@@ -565,7 +565,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
     const leadOriginMap = new Map<string, string>();
     let descartadosCount = 0;
     leadsData.forEach(l => {
-      leadOriginMap.set(l.id, (l.origem || '').toLowerCase());
+      leadOriginMap.set(String(l.id), (l.origem || '').toLowerCase());
       if (l.status_atual?.toLowerCase().includes('descartad')) {
          descartadosCount++;
       }
@@ -586,7 +586,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
     const hottestLeadsList: any[] = [];
 
     leadsData.forEach(lead => {
-      const score = leadHottestStatus.get(lead.id) || 0;
+      const score = leadHottestStatus.get(String(lead.id)) || 0;
       if (score >= 4) {
         if (isAllowedVendaOrigin(lead.origin_treated)) {
            rCount++;
@@ -627,7 +627,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
     const selectedMonthStrings = hasSpecificCompetences ? (filters.competences || []).map(c => c.substring(0, 7)) : [];
 
     snapshotDataAll.forEach((row: any) => {
-      if (!activeLeadIds.has(row.lead_id)) return; // FILTER BY ACTIVE LEADS
+      const stringifiedLeadId = String(row.lead_id);
+      if (!activeLeadIds.has(stringifiedLeadId)) return; // FILTER BY ACTIVE LEADS
 
       const status = row.status_final_mes || 'Sem Status';
       if (status.toLowerCase().includes('ação') || status.toLowerCase().includes('acao')) return; // exclude
@@ -663,7 +664,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
       if (!stackedDataMap.has(status)) stackedDataMap.set(status, new Map());
       const statusMonths = stackedDataMap.get(status)!;
       if (!statusMonths.has(monthStr)) statusMonths.set(monthStr, new Set());
-      if (row.lead_id) statusMonths.get(monthStr)!.add(row.lead_id);
+      if (row.lead_id) statusMonths.get(monthStr)!.add(stringifiedLeadId);
     });
 
     const availableMonths = Array.from(monthsSet).sort((a, b) => {
