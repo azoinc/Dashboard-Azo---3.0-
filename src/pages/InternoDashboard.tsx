@@ -223,10 +223,11 @@ export default function InternoDashboard({ onBack }: Props) {
   });
 
   const [interactiveFilters, setInteractiveFilters] = useState<{ origin?: string; cancelReason?: string; month?: string; status?: string; }>({});
+  const [hottestPage, setHottestPage] = useState(1);
 
   const { 
     loading, error, statusData, funnelData, stackedStatusData, availableMonths, brokerTimeData, brokerActionsData, 
-    originData, cancelReasons, brokerLeads, lineData, lineChartKeys, totalLeads, hottestStatusData 
+    originData, cancelReasons, brokerLeads, lineData, lineChartKeys, totalLeads, hottestStatusData, hottestLeadsList 
   } = useInternoDashboard({ ...filters, interactiveFilters });
 
   const displayStatusData = statusData;
@@ -580,6 +581,73 @@ export default function InternoDashboard({ onBack }: Props) {
                 </ResponsiveContainer>
               </div>
             </div>
+
+            {/* Hottest Leads List */}
+            {hottestLeadsList && hottestLeadsList.length > 0 && (
+              <div className="bg-white p-6 rounded-xl border border-slate-200">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-slate-900">Leads Mais Quentes do Mês (Agendaram ou Visitaram)</h3>
+                  <span className="text-xs text-slate-500 font-medium">{hottestLeadsList.length} leads</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100">
+                        <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Lead</th>
+                        <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Status Máximo Alcançado</th>
+                        <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Status Atual</th>
+                        <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Corretor</th>
+                        <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase">Empreendimento</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(hottestLeadsList || []).slice((hottestPage - 1) * 5, hottestPage * 5).map((lead: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-3 px-4 text-sm font-medium text-slate-900">{lead.nome}</td>
+                          <td className="py-3 px-4 text-sm text-slate-500">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                              lead.maxStep === 'Venda' ? 'bg-green-100 text-green-800' :
+                              lead.maxStep === 'Proposta' ? 'bg-blue-100 text-blue-800' :
+                              lead.maxStep === 'Visita' ? 'bg-amber-100 text-amber-800' :
+                              'bg-purple-100 text-purple-800'
+                            }`}>
+                              {lead.maxStep}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-sm text-slate-600">{lead.status_atual}</td>
+                          <td className="py-3 px-4 text-sm text-slate-600">{lead.corretor}</td>
+                          <td className="py-3 px-4 text-sm text-slate-600">{lead.empreendimento}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Pagination */}
+                {hottestLeadsList.length > 5 && (
+                  <div className="flex items-center justify-between mt-4 text-sm">
+                    <span className="text-slate-500">
+                      Página {hottestPage} de {Math.ceil((hottestLeadsList?.length || 0) / 5)}
+                    </span>
+                    <div className="flex space-x-2">
+                      <button 
+                        disabled={hottestPage === 1}
+                        onClick={() => setHottestPage(p => Math.max(1, p - 1))}
+                        className="px-3 py-1 rounded border border-slate-200 text-slate-600 disabled:opacity-50 hover:bg-slate-50"
+                      >
+                        Anterior
+                      </button>
+                      <button 
+                        disabled={hottestPage >= Math.ceil((hottestLeadsList?.length || 0) / 5)}
+                        onClick={() => setHottestPage(p => p + 1)}
+                        className="px-3 py-1 rounded border border-slate-200 text-slate-600 disabled:opacity-50 hover:bg-slate-50"
+                      >
+                        Próxima
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Brokers Row moved to Corretores tab */}
           </div>
