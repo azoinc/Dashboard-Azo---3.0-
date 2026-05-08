@@ -43,6 +43,7 @@ const CompetenceMultiSelect = ({ options, selected, onChange }: { options: {labe
   return (
     <div className="relative" ref={dropdownRef}>
        <button 
+         type="button"
          onClick={() => setOpen(!open)} 
          className="flex items-center space-x-2 text-slate-900 text-sm focus:outline-none bg-transparent"
        >
