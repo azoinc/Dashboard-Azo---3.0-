@@ -196,7 +196,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
             const { data: exclusionData, error: exclusionError } = await supabase
               .from('lead_milestones')
               .select('lead_id')
-              .or('para_nome.ilike.%ação%,para_nome.ilike.%marketing%,para_nome.ilike.%acao%')
+              .or('para_nome.ilike.%ação de marketing%,para_nome.ilike.%acao de marketing%,para_nome.ilike.%marketing%')
               .in('lead_id', chunk)
               .limit(50000);
             
@@ -279,11 +279,11 @@ export function useInternoDashboard(filters: DashboardFilters) {
              const chunkPromises: Promise<any>[] = [];
              
              if (!hasSpecificCompetences) {
-               chunkPromises.push(supabase.from('view_funil_maximo_com_total').select('etapa_visual, lead_id').in('lead_id', chunk));
+               chunkPromises.push(supabase.from('view_funil_maximo_com_total').select('etapa_visual, lead_id').in('lead_id', chunk) as any);
              }
-             chunkPromises.push(supabase.from('view_lead_snapshot_mensal').select('status_final_mes, competencia_data, lead_id').in('lead_id', chunk));
-             chunkPromises.push(supabase.from('view_tma_fila_atendimento').select('corretor, segundos_espera').in('lead_id', chunk));
-             chunkPromises.push(supabase.from('view_esforco_corretor').select('corretor, lead_id').in('lead_id', chunk));
+             chunkPromises.push(supabase.from('view_lead_snapshot_mensal').select('status_final_mes, competencia_data, lead_id').in('lead_id', chunk) as any);
+             chunkPromises.push(supabase.from('view_tma_fila_atendimento').select('corretor, segundos_espera').in('lead_id', chunk) as any);
+             chunkPromises.push(supabase.from('view_esforco_corretor').select('corretor, lead_id').in('lead_id', chunk) as any);
 
              const resList = await Promise.all(chunkPromises);
              allResults.push(...resList);
@@ -350,13 +350,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
     
     let leadsData = rawData.leadsData as any[];
 
-    // Exclude 'Ação de Marketing' entirely from the dashboard metrics
-    leadsData = leadsData.filter(l => {
-      const status = (l.status_atual || '').toLowerCase();
-      return status !== 'ação de marketing' && status !== 'acao de marketing';
-    });
-    
-    // Treat origins beforehand so we can filter by the treated name!
+    // Optional: Filter out 'Ação de Marketing' row from final counts if needed
     leadsData = leadsData.map(lead => {
         let origin = lead.origem || 'Desconhecida';
         const originLower = origin.toLowerCase();
