@@ -112,8 +112,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
         // More robust date strings for different backend column types
         const startDateSimple = startDateStrFull.split('T')[0];
         const endDateSimple = endDateStrFull.split('T')[0];
-        const startDateBound = startDateSimple + ' 00:00:00';
-        const endDateBound = endDateSimple + ' 23:59:59';
+        const endDateInclusive = endDateSimple + ' 23:59:59';
 
         const isTodoPeriodo = filters.period === 'Todo o período';
 
@@ -152,11 +151,11 @@ export function useInternoDashboard(filters: DashboardFilters) {
             .select('lead_id, lead_nome, status, para_nome, lead_data_cad, origem, corretor, empreendimento, motivo_cancelamento, referencia_data, hora_referencia_data')
             .gte('referencia_data', compStartStr)
             .lte('referencia_data', compEndStr)
-            .limit(30000); // Increased limit significantly
+            .limit(30000); 
             
           // The primary date period selector validates the create date of the lead
           if (!isTodoPeriodo) {
-            snapshotQuery = (snapshotQuery as any).gte('lead_data_cad', startDateBound).lte('lead_data_cad', endDateBound);
+            snapshotQuery = (snapshotQuery as any).gte('lead_data_cad', startDateSimple).lte('lead_data_cad', endDateInclusive);
           }
           
           snapshotQuery = applyProjectFilter(snapshotQuery);
@@ -171,8 +170,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
           let leadsQuery = supabase
             .from('leads')
             .select('status_atual, nome, id_cv, data_criacao_cv, origem, motivo_cancelamento, corretor, empreendimento')
-            .gte('data_criacao_cv', startDateStrFull)
-            .lte('data_criacao_cv', endDateStrFull)
+            .gte('data_criacao_cv', startDateSimple)
+            .lte('data_criacao_cv', endDateInclusive)
             .limit(10000);
 
           leadsQuery = applyProjectFilter(leadsQuery);
@@ -198,19 +197,21 @@ export function useInternoDashboard(filters: DashboardFilters) {
           const exclusionPromises = [];
           for (let i = 0; i < candidateLeadIds.length; i += chunkSize) {
              const chunk = candidateLeadIds.slice(i, i + chunkSize);
+             
+             // Optimized exclusion query: only fetching IDs that match exclusion criteria
              exclusionPromises.push(
                supabase
                  .from('lead_milestones')
-                 .select('lead_id, para_nome, status')
+                 .select('lead_id')
+                 .or('para_nome.ilike.%ação%,para_nome.ilike.%acao%,status.ilike.%ação%,status.ilike.%acao%')
                  .in('lead_id', chunk)
-                 .limit(10000)
              );
              exclusionPromises.push(
                supabase
                  .from('leads')
-                 .select('id_cv, status_atual, motivo_cancelamento, origem')
+                 .select('id_cv')
+                 .or('status_atual.ilike.%ação%,status_atual.ilike.%acao%,motivo_cancelamento.ilike.%ação%,motivo_cancelamento.ilike.%acao%,origem.ilike.%ação%,origem.ilike.%acao%')
                  .in('id_cv', chunk)
-                 .limit(10000)
              );
           }
           const exclusionRes = await Promise.all(exclusionPromises);
@@ -220,27 +221,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
             }
             if (res.data) {
               res.data.forEach((r: any) => {
-                let isExcluded = false;
-                const terms = [
-                  String(r.para_nome || '').toLowerCase(),
-                  String(r.status || '').toLowerCase(),
-                  String(r.status_atual || '').toLowerCase(),
-                  String(r.motivo_cancelamento || '').toLowerCase(),
-                  String(r.origem || '').toLowerCase()
-                ];
-                
-                for (const term of terms) {
-                  if (term.includes('ação') || term.includes('acao')) {
-                    isExcluded = true;
-                    break;
-                  }
-                }
-
-                if (isExcluded) {
-                  const id = String(r.lead_id || r.id_cv);
-                  if (id && id !== 'undefined' && id !== 'null') {
-                    excludedLeadIds.add(id);
-                  }
+                const id = String(r.lead_id || r.id_cv);
+                if (id && id !== 'undefined' && id !== 'null') {
+                  excludedLeadIds.add(id);
                 }
               });
             }
