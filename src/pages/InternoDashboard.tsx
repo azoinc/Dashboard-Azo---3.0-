@@ -322,10 +322,20 @@ export default function InternoDashboard({ onBack }: Props) {
   }, [interactiveFilters]);
   const [hottestPage, setHottestPage] = useState(1);
 
+  const memoizedFilters = useMemo(() => ({
+    period: filters.period,
+    project: filters.project,
+    broker: filters.broker,
+    origin: filters.origin,
+    startDate: filters.startDate,
+    endDate: filters.endDate,
+    competences: filters.competences,
+  }), [filters.period, filters.project, filters.broker, filters.origin, filters.startDate, filters.endDate, JSON.stringify(filters.competences)]);
+
   const { 
     loading, error, statusData, funnelData, stackedStatusData, availableMonths, brokerTimeData, brokerActionsData, 
     originData, cancelReasons, brokerLeads, lineData, lineChartKeys, totalLeads, hottestStatusData, hottestLeadsList 
-  } = useInternoDashboard({ ...filters, interactiveFilters });
+  } = useInternoDashboard({ ...memoizedFilters, interactiveFilters });
 
   const displayStatusData = statusData;
   const displayFunnelData = funnelData;
@@ -566,10 +576,19 @@ export default function InternoDashboard({ onBack }: Props) {
                       verticalAlign="top" 
                       height={36}
                       formatter={(value, entry: any) => {
-                        const { payload } = entry;
-                        // For stacked bars, payload is the category data across series.
-                        // This is tricky for Legend. Let's just keep the month name but polished.
-                        return <span className="text-slate-600 text-xs font-medium">{value}</span>;
+                        // value is the month name
+                        // Find the total for this month across all categories
+                        const monthTotal = displayStackedStatusData.reduce((acc, curr) => acc + (curr[value] || 0), 0);
+                        const grandTotal = displayStackedStatusData.reduce((acc, curr) => {
+                          const rowTotal = availableMonths.reduce((sum, m) => sum + (curr[m] || 0), 0);
+                          return acc + rowTotal;
+                        }, 0);
+                        const percentage = grandTotal > 0 ? ((monthTotal / grandTotal) * 100).toFixed(1) : '0';
+                        return (
+                          <span className="text-slate-600 text-xs font-semibold mr-4">
+                            {value}: {monthTotal} ({percentage}%)
+                          </span>
+                        );
                       }}
                     />
                     {displayAvailableMonths.map((month, idx) => (
@@ -696,7 +715,13 @@ export default function InternoDashboard({ onBack }: Props) {
                         formatter={(value) => {
                           // Find total for this project across all line data
                           const total = displayLineData.reduce((acc, curr) => acc + (curr[value] || 0), 0);
-                          return <span className="text-slate-600 text-xs font-medium">{value} ({total})</span>;
+                          const grandTotal = displayLineData.reduce((acc, curr) => {
+                             let sum = 0;
+                             lineChartKeys.forEach(k => sum += (curr[k] || 0));
+                             return acc + sum;
+                          }, 0);
+                          const pct = grandTotal > 0 ? ((total / grandTotal) * 100).toFixed(1) : '0';
+                          return <span className="text-slate-600 text-[10px] font-medium">{value}: {total} ({pct}%)</span>;
                         }}
                       />
                       {displayLineChartKeys.map((key, idx) => (
