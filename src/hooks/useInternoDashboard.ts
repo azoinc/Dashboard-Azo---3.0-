@@ -135,14 +135,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
           .select('lead_id, lead_nome, status, para_nome, lead_data_cad, origem, corretor, empreendimento, motivo_cancelamento, referencia_data, hora_referencia_data')
           .limit(40000);
 
-        // Apply filters directly to milestones
-        if (!isTodoPeriodo) {
-          milestonesQuery = (milestonesQuery as any)
-            .gte('lead_data_cad', startDateSimple)
-            .lte('lead_data_cad', endDateInclusive);
-        }
-
+        // Apply primary date filter
         if (hasSpecificCompetences) {
+          // If a Specific Competence is selected, we prioritize fetching milestones for that month
           const dates = (filters.competences || []).map(c => new Date(c + "T00:00:00Z"));
           const compStartDate = new Date(Math.min(...dates.map(d => d.getTime())));
           const compEndDate = new Date(Math.max(...dates.map(d => d.getTime())));
@@ -152,6 +147,20 @@ export function useInternoDashboard(filters: DashboardFilters) {
           milestonesQuery = (milestonesQuery as any)
             .gte('referencia_data', compStartDate.toISOString().split('T')[0])
             .lte('referencia_data', compEndDate.toISOString().split('T')[0]);
+          
+          // Optionally still filter by registration date if not "Todo o período"
+          if (!isTodoPeriodo) {
+            milestonesQuery = (milestonesQuery as any)
+              .gte('lead_data_cad', startDateSimple)
+              .lte('lead_data_cad', endDateInclusive);
+          }
+        } else {
+          // No specific competence: use registration date as primary filter
+          if (!isTodoPeriodo) {
+            milestonesQuery = (milestonesQuery as any)
+              .gte('lead_data_cad', startDateSimple)
+              .lte('lead_data_cad', endDateInclusive);
+          }
         }
 
         milestonesQuery = applyProjectFilter(milestonesQuery);
@@ -163,6 +172,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
         if (milestonesError) throw milestonesError;
 
         const rawDataFromMilestones = milestonesData || [];
+        console.log(`[Dashboard] Fetched ${rawDataFromMilestones.length} milestones`);
 
         // PHASE 1.5: Final check for 'Ação de Marketing' in ANY milestone for these leads (Historical Exclusion)
         const candidateLeadIds = Array.from(new Set(
@@ -171,19 +181,26 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
         const excludedLeadIds = new Set<string>();
         if (candidateLeadIds.length > 0) {
-          const chunkSize = 500;
+          const chunkSize = 1000; // Increased chunk size for parallel efficiency
+          const exclusionPromises = [];
           for (let i = 0; i < candidateLeadIds.length; i += chunkSize) {
             const chunk = candidateLeadIds.slice(i, i + chunkSize);
-            const { data: exclusionData } = await supabase
-              .from('lead_milestones')
-              .select('lead_id')
-              .or('status.ilike.%ação de marketing%,para_nome.ilike.%ação de marketing%,origem.ilike.%ação de marketing%,status.ilike.%acao de marketing%,para_nome.ilike.%acao de marketing%,origem.ilike.%acao de marketing%')
-              .in('lead_id', chunk);
-            
-            if (exclusionData) {
-              exclusionData.forEach(r => excludedLeadIds.add(String(r.lead_id)));
-            }
+            exclusionPromises.push(
+              supabase
+                .from('lead_milestones')
+                .select('lead_id')
+                .or('status.ilike.%ação de marketing%,para_nome.ilike.%ação de marketing%,origem.ilike.%ação de marketing%,status.ilike.%acao de marketing%,para_nome.ilike.%acao de marketing%,origem.ilike.%acao de marketing%')
+                .in('lead_id', chunk)
+            );
           }
+          
+          const exclusionResults = await Promise.all(exclusionPromises);
+          exclusionResults.forEach(res => {
+            if (res.data) {
+              res.data.forEach((r: any) => excludedLeadIds.add(String(r.lead_id)));
+            }
+          });
+          console.log(`[Dashboard] Excluded ${excludedLeadIds.size} leads due to 'Ação de Marketing' status history`);
         }
 
         // PHASE 2: Deduplicate and build leads population
