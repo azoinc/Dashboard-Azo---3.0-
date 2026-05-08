@@ -332,10 +332,12 @@ export default function InternoDashboard({ onBack }: Props) {
     competences: filters.competences,
   }), [filters.period, filters.project, filters.broker, filters.origin, filters.startDate, filters.endDate, JSON.stringify(filters.competences)]);
 
+  const memoizedInteractiveFilters = useMemo(() => interactiveFilters, [JSON.stringify(interactiveFilters)]);
+
   const { 
     loading, error, statusData, funnelData, stackedStatusData, availableMonths, brokerTimeData, brokerActionsData, 
     originData, cancelReasons, brokerLeads, lineData, lineChartKeys, totalLeads, hottestStatusData, hottestLeadsList 
-  } = useInternoDashboard({ ...memoizedFilters, interactiveFilters });
+  } = useInternoDashboard({ ...memoizedFilters, interactiveFilters: memoizedInteractiveFilters });
 
   const displayStatusData = statusData;
   const displayFunnelData = funnelData;
@@ -823,6 +825,17 @@ export default function InternoDashboard({ onBack }: Props) {
                       <XAxis type="number" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                       <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} width={150} />
                       <Tooltip content={<CustomTooltip />} />
+                      <Legend 
+                        layout="vertical" 
+                        align="right" 
+                        verticalAlign="middle"
+                        formatter={(value, entry: any) => {
+                          const total = displayBrokerLeads.reduce((acc, curr) => acc + curr.value, 0);
+                          const val = entry.payload.value || 0;
+                          const percent = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
+                          return <span className="text-slate-600 text-[10px]">{value}: <strong>{val}</strong> ({percent}%)</span>;
+                        }}
+                      />
                       <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
