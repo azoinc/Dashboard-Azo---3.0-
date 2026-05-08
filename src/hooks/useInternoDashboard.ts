@@ -140,18 +140,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
           .gte('lead_data_cad', startDateSimple)
           .lte('lead_data_cad', endDateInclusive);
 
-        // Apply secondary month filter (competency) if active
-        if (hasSpecificCompetences) {
-          const dates = (filters.competences || []).map(c => new Date(c + "T00:00:00Z"));
-          const compStartDate = new Date(Math.min(...dates.map(d => d.getTime())));
-          const compEndDate = new Date(Math.max(...dates.map(d => d.getTime())));
-          compEndDate.setMonth(compEndDate.getMonth() + 1);
-          compEndDate.setDate(0); 
-
-          milestonesQuery = (milestonesQuery as any)
-            .gte('referencia_data', compStartDate.toISOString().split('T')[0])
-            .lte('referencia_data', compEndDate.toISOString().split('T')[0]);
-        }
+        // CRITICAL: We NO LONGER apply 'referencia_data' filter here.
+        // The population is defined strictly by the registration date.
+        // If hasSpecificCompetences is active, we use those leads' history and snapshots to show their state at that time.
 
         milestonesQuery = applyProjectFilter(milestonesQuery);
         if (filters.broker !== 'Todos') {
@@ -162,7 +153,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
         if (milestonesError) throw milestonesError;
 
         const rawDataFromMilestones = milestonesData || [];
-        console.log(`[Dashboard] Fetched ${rawDataFromMilestones.length} raw milestones`);
+        console.log(`[Dashboard] Fetched ${rawDataFromMilestones.length} raw milestones for registration period`);
 
         if (rawDataFromMilestones.length === 0) {
            setRawData({
