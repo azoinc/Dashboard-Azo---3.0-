@@ -61,12 +61,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
         if (cachedRawData) {
           setRawData(cachedRawData);
           setLoading(false); // Update UI immediately from cache
-        } else {
-          setRawData(null); // Clear old data if no cache
         }
       } catch (e) {
         console.error('Cache read error', e);
-        setRawData(null);
       }
 
       try {
