@@ -125,22 +125,65 @@ export function useInternoDashboard(filters: DashboardFilters) {
         };
 
         let leadsData: any[] | null = [];
-        let syntheticFunnelData: any[] = [];
+        let rawLeadsData: any[] = [];
         const hasSpecificCompetences = filters.competences && filters.competences.length > 0 && !filters.competences.includes('Atual');
 
-        let leadsQuery = supabase
-          .from('leads')
-          .select('status_atual, nome, id_cv, data_criacao_cv, origem, motivo_cancelamento, corretor, empreendimento')
-          .gte('data_criacao_cv', startDateStr)
-          .lte('data_criacao_cv', endDateStr);
+        if (hasSpecificCompetences) {
+           // Find min and max dates across selected competences
+           const dates = (filters.competences || []).map(c => new Date(c + "T00:00:00Z"));
+           const compStartDate = new Date(Math.min(...dates.map(d => d.getTime())));
+           const compEndDate = new Date(Math.max(...dates.map(d => d.getTime())));
+           compEndDate.setMonth(compEndDate.getMonth() + 1);
+           compEndDate.setDate(0); // Last day of the month
 
-        leadsQuery = applyProjectFilter(leadsQuery);
-        if (filters.broker !== 'Todos') {
-          leadsQuery = leadsQuery.ilike('corretor', `%${filters.broker}%`);
+           const compStartStr = compStartDate.toISOString().split('T')[0];
+           const compEndStr = compEndDate.toISOString().split('T')[0];
+
+           const { data: snapIds, error: snapErr } = await supabase
+             .from('view_lead_snapshot_mensal')
+             .select('lead_id')
+             .gte('competencia_data', compStartStr)
+             .lte('competencia_data', compEndStr);
+
+           if (snapErr) throw snapErr;
+
+           const validLeadIds = Array.from(new Set(snapIds?.map((r: any) => r.lead_id).filter(id => id != null)));
+
+           if (validLeadIds.length > 0) {
+              const chunkSize = 1000;
+              for (let i = 0; i < validLeadIds.length; i += chunkSize) {
+                 const chunk = validLeadIds.slice(i, i + chunkSize);
+                 let leadsQuery = supabase
+                   .from('leads')
+                   .select('status_atual, nome, id_cv, data_criacao_cv, origem, motivo_cancelamento, corretor, empreendimento')
+                   .in('id_cv', chunk);
+
+                 leadsQuery = applyProjectFilter(leadsQuery);
+                 if (filters.broker !== 'Todos') {
+                   leadsQuery = leadsQuery.ilike('corretor', `%${filters.broker}%`);
+                 }
+
+                 const { data, error } = await leadsQuery;
+                 if (error) throw error;
+                 if (data) rawLeadsData.push(...data);
+              }
+           }
+        } else {
+           let leadsQuery = supabase
+             .from('leads')
+             .select('status_atual, nome, id_cv, data_criacao_cv, origem, motivo_cancelamento, corretor, empreendimento')
+             .gte('data_criacao_cv', startDateStr)
+             .lte('data_criacao_cv', endDateStr);
+
+           leadsQuery = applyProjectFilter(leadsQuery);
+           if (filters.broker !== 'Todos') {
+             leadsQuery = leadsQuery.ilike('corretor', `%${filters.broker}%`);
+           }
+
+           const { data: leadsRes, error: leadsErr } = await leadsQuery;
+           if (leadsErr) throw leadsErr;
+           if (leadsRes) rawLeadsData = leadsRes;
         }
-
-        const { data: rawLeadsData, error: leadsErr } = await leadsQuery;
-        if (leadsErr) throw leadsErr;
 
         // Simplify exclusions: Just rely on current leads data to exclude "ação"
         const excludedLeadIds = new Set<string>();
@@ -222,53 +265,23 @@ export function useInternoDashboard(filters: DashboardFilters) {
                 const snapMonth = snap.competencia_data?.substring(0, 7);
                 if (snapMonth && selectedMonthStrings.includes(snapMonth)) {
                    const leadIdStr = String(snap.lead_id);
-                   // Exclude 'ação' and 'acao' from snapshots as well
                    const st = String(snap.status_final_mes || '').toLowerCase();
                    if (!st.includes('ação') && !st.includes('acao')) {
-                     // Get latest if multiple competences selected (assuming sorting by date string works)
-                     const existing = validLeadsFromSnapshots.get(leadIdStr);
-                     // If multiple months cover the same lead, we want the most recent status from the *selected* months
-                     // This simple logic overwrites, assuming allSnapshots are relatively random or we can just pick the last one.
-                     // A more robust way is to compare competence_data.
                      validLeadsFromSnapshots.set(leadIdStr, snap.status_final_mes); 
                    }
                 }
              });
 
-             leadsData = leadsData.filter(l => validLeadsFromSnapshots.has(l.id)).map(l => ({
+             leadsData = leadsData.filter(l => validLeadsFromSnapshots.has(String(l.id))).map(l => ({
                ...l,
-               status_atual: validLeadsFromSnapshots.get(l.id) || l.status_atual
+               status_atual: validLeadsFromSnapshots.get(String(l.id)) || l.status_atual
              }));
-
-             leadsData.forEach(lead => {
-               const st = String(lead.status_atual).toLowerCase();
-               const stringLeadId = lead.id;
-               
-               syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '1. Total de Leads' });
-               if (!st.includes('aguardando')) {
-                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '2. Em Atendimento' });
-               }
-               if (st.includes('agendam') || st.includes('agendado') || st.includes('visita') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
-                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '3. Agendamento' });
-               }
-               if (st.includes('visita') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
-                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '4. Visita' });
-               }
-               if (st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
-                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '5. Proposta/Negociação' });
-               }
-               if (st.includes('venda') || st.includes('contrato')) {
-                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '6. Vendas' });
-               }
-             });
-
-             funnelRes = { data: syntheticFunnelData, error: null };
-           } else {
-             funnelRes = { 
-               data: funnelResponses.flatMap(r => r.data || []), 
-               error: funnelResponses.find(r => r.error)?.error || null 
-             };
            }
+           
+           funnelRes = { 
+             data: funnelResponses.flatMap(r => r.data || []), 
+             error: funnelResponses.find(r => r.error)?.error || null 
+           };
            
            snapshotRes = snapshotResponses;
            tmaData = tmaResponses.flatMap(r => r.data || []);
