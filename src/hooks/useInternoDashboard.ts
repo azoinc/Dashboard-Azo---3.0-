@@ -34,19 +34,21 @@ export function useInternoDashboard(filters: DashboardFilters) {
   const [rawData, setRawData] = useState<any>(null);
 
   useEffect(() => {
+    let aborted = false;
+
     async function fetchData() {
       if (!supabase) {
-        setError('Supabase client not initialized');
-        setLoading(false);
+        if (!aborted) {
+          setError('Supabase client not initialized');
+          setLoading(false);
+        }
         return;
       }
 
       setLoading(true);
       setError(null);
-      // We do not clear rawData manually here because we want to see the cached data immediately if available,
-      // but if the fetch fails, we should clear it.
 
-      const cacheKey = `dashboardCacheV2_${JSON.stringify({
+      const cacheKey = `dashboardCacheV3_${JSON.stringify({
         period: filters.period,
         project: filters.project,
         broker: filters.broker,
@@ -58,12 +60,16 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
       try {
         const cachedRawData = await localforage.getItem(cacheKey);
+        if (aborted) return;
         if (cachedRawData) {
           setRawData(cachedRawData);
-          setLoading(false); // Update UI immediately from cache
+          setLoading(false);
+        } else {
+          setRawData(null);
         }
       } catch (e) {
         console.error('Cache read error', e);
+        if (!aborted) setRawData(null);
       }
 
       try {
@@ -103,241 +109,181 @@ export function useInternoDashboard(filters: DashboardFilters) {
           return `${y}-${m}-${d}T00:00:00.000Z`;
         };
 
-        const startDateStrFull = formatYYYYMMDDStart(startDate);
-        const endDateStrFull = formatYYYYMMDDEnd(endDate);
-
-        // Determine Registration Date Bounds
-        const startDateSimple = startDateStrFull.split('T')[0];
-        const endDateSimple = endDateStrFull.split('T')[0];
-        const endDateInclusive = endDateSimple + ' 23:59:59';
-        const isTodoPeriodo = filters.period === 'Todo o período';
+        const startDateStr = formatYYYYMMDDStart(startDate);
+        const endDateStr = formatYYYYMMDDEnd(endDate);
 
         const applyProjectFilter = (query: any) => {
-          if (filters.project && filters.project !== 'Todos') {
-            // Use ilike for more flexibility with names
-            const baseName = filters.project
-              .replace('Ar ', '')
-              .replace(' Home', '')
-              .replace(' Peninsula', '')
-              .replace(' Cambui', '')
-              .trim();
-            
-            return (query as any).or(`empreendimento.ilike.%${filters.project}%,empreendimento.ilike.%${baseName}%`);
-          } else if (filters.city && filters.city !== 'ALL' && filters.city) {
+          if (filters.project !== 'Todos') {
+            return (query as any).ilike('empreendimento', `%${filters.project}%`);
+          } else if (filters.city && filters.city !== 'ALL') {
              const cityProjects = PROJECTS_BY_CITY[filters.city as keyof typeof PROJECTS_BY_CITY];
              if (cityProjects && cityProjects.length > 0) {
-               return (query as any).in('empreendimento', cityProjects);
+               return query.in('empreendimento', cityProjects);
              }
           }
           return query;
         };
 
+        let leadsData: any[] | null = [];
+        let syntheticFunnelData: any[] = [];
         const hasSpecificCompetences = filters.competences && filters.competences.length > 0 && !filters.competences.includes('Atual');
 
-        // PHASE 1: Get the population of leads based on lead_milestones
-        let milestonesQuery = supabase
-          .from('lead_milestones')
-          .select('lead_id, lead_nome, status, para_nome, lead_data_cad, origem, corretor, empreendimento, motivo_cancelamento, referencia_data, hora_referencia_data')
-          .limit(50000);
+        let leadsQuery = supabase
+          .from('leads')
+          .select('status_atual, nome, id_cv, data_criacao_cv, origem, motivo_cancelamento, corretor, empreendimento')
+          .gte('data_criacao_cv', startDateStr)
+          .lte('data_criacao_cv', endDateStr);
 
-        // ALWAYS apply registration date filter as requested
-        milestonesQuery = (milestonesQuery as any)
-          .gte('lead_data_cad', startDateSimple)
-          .lte('lead_data_cad', endDateInclusive);
-
-        // Apply project filter to milestones query
-        milestonesQuery = applyProjectFilter(milestonesQuery);
-
+        leadsQuery = applyProjectFilter(leadsQuery);
         if (filters.broker !== 'Todos') {
-          milestonesQuery = (milestonesQuery as any).ilike('corretor', `%${filters.broker}%`);
+          leadsQuery = leadsQuery.ilike('corretor', `%${filters.broker}%`);
         }
 
-        const { data: milestonesData, error: milestonesError } = await milestonesQuery;
-        if (milestonesError) throw milestonesError;
+        const { data: rawLeadsData, error: leadsErr } = await leadsQuery;
+        if (leadsErr) throw leadsErr;
 
-        const rawDataFromMilestones = milestonesData || [];
-        console.log(`[Dashboard] Fetched ${rawDataFromMilestones.length} raw milestones for registration period`);
-
-        if (rawDataFromMilestones.length === 0) {
-           setRawData({
-             leadsData: [],
-             funnelRes: { data: [], error: null },
-             snapshotRes: [],
-             tmaData: [],
-             actionsData: []
-           });
-           setLoading(false);
-           return;
+        // Simplify exclusions: Just rely on current leads data to exclude "ação"
+        const excludedLeadIds = new Set<string>();
+        if (rawLeadsData) {
+          rawLeadsData.forEach((r: any) => {
+            let isExcluded = false;
+            const terms = [
+              String(r.status_atual || '').toLowerCase(),
+              String(r.motivo_cancelamento || '').toLowerCase(),
+              String(r.origem || '').toLowerCase()
+            ];
+            for (const term of terms) {
+              if (term.includes('ação') || term.includes('acao')) {
+                isExcluded = true;
+                break;
+              }
+            }
+            if (isExcluded && r.id_cv) excludedLeadIds.add(String(r.id_cv));
+          });
         }
 
-        // PHASE 2: Deduplicate and build leads population
-        // Group milestones by lead to find the latest state
-        const milestonesByLead = new Map<string, any[]>();
-        rawDataFromMilestones.forEach(m => {
-          const lid = String(m.lead_id);
-          if (!lid || lid === 'null' || lid === 'undefined') return;
-          if (!milestonesByLead.has(lid)) milestonesByLead.set(lid, []);
-          milestonesByLead.get(lid)!.push(m);
-        });
-
-        const leadsData: any[] = [];
-        const syntheticFunnelCounts: Record<string, number> = {};
-        const leadHottestScore = new Map<string, number>();
-
-        // Sort helper for milestones (Latest first)
-        const getLatestMilestone = (list: any[]) => {
-          return [...list].sort((a, b) => {
-            const dateA = a.referencia_data || '';
-            const dateB = b.referencia_data || '';
-            if (dateA !== dateB) return dateB.localeCompare(dateA);
-            const timeA = a.hora_referencia_data || '';
-            const timeB = b.hora_referencia_data || '';
-            return timeB.localeCompare(timeA);
-          })[0];
-        };
-
-        let excludedByMarketingCount = 0;
-
-        for (const [lid, history] of milestonesByLead.entries()) {
-          // CRITICAL: Check if this lead EVER had a marketing status in its history
-          const hasMarketingHistory = history.some(item => {
-            const st = String(item.status || item.para_nome || '').toLowerCase();
-            return st.includes('marketing') || st.includes('ação de marketing') || st.includes('acao de marketing');
-          });
-
-          if (hasMarketingHistory) {
-            excludedByMarketingCount++;
-            continue; 
-          }
-
-          const latest = getLatestMilestone(history);
-          if (!latest) continue;
-
-          leadsData.push({
-            status_atual: latest.status || latest.para_nome || 'Sem Status',
-            id: lid,
-            nome: latest.lead_nome,
-            lead_data_cad: latest.lead_data_cad,
-            origem: latest.origem,
-            motivo_cancelamento: latest.motivo_cancelamento,
-            corretor: latest.corretor,
-            empreendimento: latest.empreendimento
-          });
-
-          // Build synthetic funnel based on history 
-          const reachedStages = new Set<string>();
-          reachedStages.add('1. Total de Leads');
-          
-          let capDate = '9999-12-31';
-          if (hasSpecificCompetences) {
-            const dates = (filters.competences || []).map(c => new Date(c + "T00:00:00Z"));
-            const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
-            maxDate.setMonth(maxDate.getMonth() + 1);
-            maxDate.setDate(0); 
-            capDate = maxDate.toISOString().split('T')[0];
-          }
-
-          let highestScore = 0;
-          history.forEach(item => {
-             const refDate = item.referencia_data || '';
-             if (refDate > capDate) return; 
-
-             const st = (item.status || item.para_nome || '').toLowerCase();
-
-             if (!st.includes('aguardando')) reachedStages.add('2. Em Atendimento');
-             if (st.match(/agendam|agendado|visita|proposta|negocia|venda/)) {
-               reachedStages.add('3. Agendamento');
-               highestScore = Math.max(highestScore, 1);
-             }
-             if (st.match(/visita|proposta|negocia|venda/)) {
-               reachedStages.add('4. Visita');
-               highestScore = Math.max(highestScore, 2);
-             }
-             if (st.match(/proposta|negocia|venda/)) {
-               reachedStages.add('5. Proposta/Negociação');
-               highestScore = Math.max(highestScore, 3);
-             }
-             if (st.match(/venda|contrato/)) {
-               reachedStages.add('6. Vendas');
-               highestScore = Math.max(highestScore, 4);
-             }
-          });
-
-          reachedStages.forEach(stage => {
-            syntheticFunnelCounts[stage] = (syntheticFunnelCounts[stage] || 0) + 1;
-          });
-          leadHottestScore.set(lid, highestScore);
-        }
-
-        console.log(`[Dashboard] Final population: ${leadsData.length} unique leads (Excluded ${excludedByMarketingCount} leads with marketing history)`);
-
+        leadsData = (rawLeadsData || [])
+           .filter((item: any) => !excludedLeadIds.has(String(item.id_cv)))
+           .map((item: any) => ({
+             status_atual: item.status_atual,
+             id: String(item.id_cv),
+             nome: item.nome,
+             lead_data_cad: item.data_criacao_cv,
+             origem: item.origem,
+             motivo_cancelamento: item.motivo_cancelamento,
+             corretor: item.corretor,
+             empreendimento: item.empreendimento
+           }));
 
         let funnelRes = { data: [] as any[], error: null };
         let snapshotRes: any[] = [];
         let tmaData: any[] = [];
         let actionsData: any[] = [];
 
-        if (leadsData.length > 0) {
+        if (leadsData && leadsData.length > 0) {
            const leadIds = leadsData.map(l => l.id);
-           const chunkSize = 1500;
-           const allResults: any[] = [];
-           
-           const batches = [];
+           const chunkSize = 1000;
+           const snapshotPromises = [];
+           const funnelPromises = [];
+           const tmaPromises = [];
+           const actionsPromises = [];
+
            for (let i = 0; i < leadIds.length; i += chunkSize) {
-             batches.push(leadIds.slice(i, i + chunkSize));
+             const chunk = leadIds.slice(i, i + chunkSize);
+             snapshotPromises.push(
+               supabase.from('view_lead_snapshot_mensal').select('status_final_mes, competencia_data, lead_id').in('lead_id', chunk)
+             );
+             funnelPromises.push(
+               supabase.from('view_funil_maximo_com_total').select('etapa_visual, lead_id').in('lead_id', chunk)
+             );
+             tmaPromises.push(
+               supabase.from('view_tma_fila_atendimento').select('corretor, segundos_espera').in('lead_id', chunk)
+             );
+             actionsPromises.push(
+               supabase.from('view_esforco_corretor').select('corretor, lead_id').in('lead_id', chunk)
+             );
            }
 
-           console.time('[MetricsFetch]');
-           // Sequential processing for metrics to avoid pooler exhaust during high volume
-           for (const chunk of batches) {
-             const chunkPromises: Promise<any>[] = [];
-             
-             if (!hasSpecificCompetences) {
-               let q = supabase.from('view_funil_maximo_com_total').select('etapa_visual, lead_id').in('lead_id', chunk);
-               chunkPromises.push(q as any);
-             }
-             
-             let sq = supabase.from('view_lead_snapshot_mensal').select('status_final_mes, competencia_data, lead_id').in('lead_id', chunk);
-             chunkPromises.push(sq as any);
-
-             // TMA and esforço normally follow the broker but we can add project filter if column exists
-             chunkPromises.push(supabase.from('view_tma_fila_atendimento').select('corretor, segundos_espera').in('lead_id', chunk) as any);
-             chunkPromises.push(supabase.from('view_esforco_corretor').select('corretor, lead_id').in('lead_id', chunk) as any);
-
-             const resList = await Promise.all(chunkPromises);
-             allResults.push(...resList);
-           }
-           console.timeEnd('[MetricsFetch]');
+           const res = await Promise.all([...funnelPromises, ...snapshotPromises, ...tmaPromises, ...actionsPromises]);
            
-           const resultsList = allResults;
+           let offset = 0;
+           const funnelResponses = res.slice(offset, offset + funnelPromises.length); offset += funnelPromises.length;
+           const snapshotResponses = res.slice(offset, offset + snapshotPromises.length); offset += snapshotPromises.length;
+           const tmaResponses = res.slice(offset, offset + tmaPromises.length); offset += tmaPromises.length;
+           const actionsResponses = res.slice(offset, offset + actionsPromises.length);
+           
+           const allSnapshots = snapshotResponses.flatMap(r => r.data || []);
            
            if (hasSpecificCompetences) {
-             funnelRes = { data: [], error: null };
-             // resultsList: [snapshot, tma, actions, snapshot, tma, actions...] (3 per chunk)
-             snapshotRes = resultsList.filter((_, idx) => (idx % 3 === 0)); 
-             tmaData = resultsList.filter((_, idx) => (idx % 3 === 1)).flatMap(r => r.data || []);
-             actionsData = resultsList.filter((_, idx) => (idx % 3 === 2)).flatMap(r => r.data || []);
-           } else {
-             // resultsList: [funnel, snapshot, tma, actions, ...] (4 per chunk)
-             const step = 4;
-             funnelRes = { data: resultsList.filter((_, idx) => idx % step === 0).flatMap(r => r.data || []), error: null };
-             snapshotRes = resultsList.filter((_, idx) => idx % step === 1);
-             tmaData = resultsList.filter((_, idx) => idx % step === 2).flatMap(r => r.data || []);
-             actionsData = resultsList.filter((_, idx) => idx % step === 3).flatMap(r => r.data || []);
-           }
-        }
+             const selectedMonthStrings = (filters.competences || []).map(c => c.substring(0, 7)); // YYYY-MM
+             
+             const validLeadsFromSnapshots = new Map<string, string>(); // lead_id -> latest status_final_mes
+             allSnapshots.forEach((snap: any) => {
+                const snapMonth = snap.competencia_data?.substring(0, 7);
+                if (snapMonth && selectedMonthStrings.includes(snapMonth)) {
+                   const leadIdStr = String(snap.lead_id);
+                   // Exclude 'ação' and 'acao' from snapshots as well
+                   const st = String(snap.status_final_mes || '').toLowerCase();
+                   if (!st.includes('ação') && !st.includes('acao')) {
+                     // Get latest if multiple competences selected (assuming sorting by date string works)
+                     const existing = validLeadsFromSnapshots.get(leadIdStr);
+                     // If multiple months cover the same lead, we want the most recent status from the *selected* months
+                     // This simple logic overwrites, assuming allSnapshots are relatively random or we can just pick the last one.
+                     // A more robust way is to compare competence_data.
+                     validLeadsFromSnapshots.set(leadIdStr, snap.status_final_mes); 
+                   }
+                }
+             });
 
+             leadsData = leadsData.filter(l => validLeadsFromSnapshots.has(l.id)).map(l => ({
+               ...l,
+               status_atual: validLeadsFromSnapshots.get(l.id) || l.status_atual
+             }));
+
+             leadsData.forEach(lead => {
+               const st = String(lead.status_atual).toLowerCase();
+               const stringLeadId = lead.id;
+               
+               syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '1. Total de Leads' });
+               if (!st.includes('aguardando')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '2. Em Atendimento' });
+               }
+               if (st.includes('agendam') || st.includes('agendado') || st.includes('visita') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '3. Agendamento' });
+               }
+               if (st.includes('visita') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '4. Visita' });
+               }
+               if (st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '5. Proposta/Negociação' });
+               }
+               if (st.includes('venda') || st.includes('contrato')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '6. Vendas' });
+               }
+             });
+
+             funnelRes = { data: syntheticFunnelData, error: null };
+           } else {
+             funnelRes = { 
+               data: funnelResponses.flatMap(r => r.data || []), 
+               error: funnelResponses.find(r => r.error)?.error || null 
+             };
+           }
+           
+           snapshotRes = snapshotResponses;
+           tmaData = tmaResponses.flatMap(r => r.data || []);
+           actionsData = actionsResponses.flatMap(r => r.data || []);
+        }
 
         const newRawData = {
           leadsData: leadsData || [],
-          syntheticFunnelCounts,
-          leadHottestScore: Object.fromEntries(leadHottestScore),
           funnelRes,
           snapshotRes,
           tmaData,
           actionsData
         };
 
+        if (aborted) return;
         setRawData(newRawData);
 
         try {
@@ -348,14 +294,18 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
       } catch (err: any) {
         console.error('Error fetching dashboard data:', err);
-        setError(err.message || 'Erro ao carregar dados do dashboard');
-        setRawData(null);
+        if (!aborted) {
+          setError(err.message || 'Erro ao carregar dados do dashboard');
+          setRawData(null);
+        }
       } finally {
-        setLoading(false);
+        if (!aborted) setLoading(false);
       }
     }
 
     fetchData();
+
+    return () => { aborted = true; };
   }, [filters.period, filters.project, filters.broker, JSON.stringify(filters.competences), filters.startDate, filters.endDate, filters.city]); // Omit interactive filters to prevent refetching
 
   const computed = useMemo(() => {
@@ -369,35 +319,15 @@ export function useInternoDashboard(filters: DashboardFilters) {
       };
     }
     
-    // Check if competences (timestamps) are active
-    const hasSpecificCompetences = filters.competences && filters.competences.length > 0 && !filters.competences.includes('Atual');
-
     let leadsData = rawData.leadsData as any[];
 
-    // Point-in-time logic: If competence (timestamp) is selected, use status from end-of-month snapshot
-    if (hasSpecificCompetences) {
-        const selectedMonths = (filters.competences || []).map(c => c.substring(0, 7)).sort();
-        const latestMonth = selectedMonths[selectedMonths.length - 1]; // Use the most recent selected month as the point-in-time reference
-
-        const snapshotDataAll = rawData.snapshotRes.flatMap((res: any) => res.data || []);
-        const pitStatusMap = new Map<string, string>();
-        
-        snapshotDataAll.forEach((row: any) => {
-           if (row.competencia_data?.startsWith(latestMonth)) {
-             pitStatusMap.set(String(row.lead_id), row.status_final_mes);
-           }
-        });
-
-        leadsData = leadsData.map(l => {
-           const pitStatus = pitStatusMap.get(String(l.id));
-           // If we have a snapshot for that month, use it. 
-           // If not, it means the lead might not have existed yet or was already finished/excluded in a way that left no snapshot.
-           // However, if they entered in Jan and we view Jan, there should be a snapshot.
-           return { ...l, status_atual: pitStatus || l.status_atual };
-        });
-    }
-
-    // Optional: Filter out 'Ação de Marketing' row from final counts if needed
+    // Exclude 'Ação de Marketing' entirely from the dashboard metrics
+    leadsData = leadsData.filter(l => {
+      const status = (l.status_atual || '').toLowerCase();
+      return !status.includes('ação') && !status.includes('acao');
+    });
+    
+    // Treat origins beforehand so we can filter by the treated name!
     leadsData = leadsData.map(lead => {
         let origin = lead.origem || 'Desconhecida';
         const originLower = origin.toLowerCase();
@@ -415,29 +345,15 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
     const activeFilter = filters.interactiveFilters || {};
     
-    // Server-side filtering is applied to lead_milestones, 
-    // but we apply client-side filtering as a secondary guarantee for consistency.
-    if (filters.project && filters.project !== 'Todos') {
-       const targetProj = filters.project.trim().toLowerCase();
-       leadsData = leadsData.filter(l => {
-         const emp = (l.empreendimento || '').trim().toLowerCase();
-         // Attempt exact match first, then partial match to be flexible with "Ar Ipanema" vs "Ipanema" etc.
-         return emp === targetProj || emp.includes(targetProj) || targetProj.includes(emp);
-       });
-    }
-
     if (activeFilter.origin) {
-       const targetOrigin = activeFilter.origin.trim().toLowerCase();
-       leadsData = leadsData.filter(l => l.origin_treated.trim().toLowerCase() === targetOrigin);
+       leadsData = leadsData.filter(l => l.origin_treated === activeFilter.origin);
     }
     if (activeFilter.cancelReason) {
-       const targetReason = activeFilter.cancelReason.trim().toLowerCase();
-       leadsData = leadsData.filter(l => (l.motivo_cancelamento_treated || '').trim().toLowerCase() === targetReason);
+       leadsData = leadsData.filter(l => l.motivo_cancelamento_treated === activeFilter.cancelReason);
     }
 
     if (filters.origin && filters.origin !== 'Todas') {
-       const targetOrigin = filters.origin.trim().toLowerCase();
-       leadsData = leadsData.filter(l => l.origin_treated.trim().toLowerCase() === targetOrigin);
+       leadsData = leadsData.filter(l => l.origin_treated === filters.origin);
     }
     
     // Create an set of active lead IDs
@@ -505,8 +421,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
     const lineChartKeys = Object.entries(empTotals).sort((a, b) => b[1] - a[1]).map(e => e[0]);
 
     // Funnel Processing
-    const funnelCounts: Record<string, number> = { ...rawData.syntheticFunnelCounts };
-    const leadHottestStatusMap = new Map<string, number>(Object.entries(rawData.leadHottestScore || {}));
+    const funnelCounts: Record<string, Set<string>> = {};
+    const leadHottestStatus = new Map<string, number>();
 
     if (!rawData.funnelRes.error && rawData.funnelRes.data) {
       rawData.funnelRes.data.forEach((row: any) => {
@@ -515,10 +431,10 @@ export function useInternoDashboard(filters: DashboardFilters) {
         
         const etapa = row.etapa_visual;
         if (etapa && leadId && leadId !== 'null' && leadId !== 'undefined') {
-          const etapaLower = etapa.toLowerCase();
-          if (etapaLower === 'ação de marketing' || etapaLower === 'acao de marketing') return;
+          if (etapa.toLowerCase().includes('ação') || etapa.toLowerCase().includes('acao')) return;
 
-          funnelCounts[etapa] = (funnelCounts[etapa] || 0) + 1;
+          if (!funnelCounts[etapa]) funnelCounts[etapa] = new Set();
+          funnelCounts[etapa].add(leadId);
 
           const fase = etapa.toLowerCase();
           let score = 0;
@@ -527,9 +443,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
           else if (fase.includes('visita')) score = 2;
           else if (fase.includes('agendamento') || fase.includes('agendado')) score = 1;
           
-          const currentScore = leadHottestStatusMap.get(leadId) || 0;
+          const currentScore = leadHottestStatus.get(leadId) || 0;
           if (score > currentScore) {
-            leadHottestStatusMap.set(leadId, score);
+            leadHottestStatus.set(leadId, score);
           }
         }
       });
@@ -537,8 +453,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
     const funnelData = Object.entries(funnelCounts)
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([name, count]) => ({ name, value: count }));
+      .map(([name, dataSet]) => ({ name, value: dataSet.size }));
       
+    const totalStage = funnelData.find((item: any) => item.name.includes('Total de Leads'));
     const totalLeads = leadsData.length;
 
     const leadOriginMap = new Map<string, string>();
@@ -551,11 +468,10 @@ export function useInternoDashboard(filters: DashboardFilters) {
     });
 
     const isAllowedVendaOrigin = (o: string) => {
-      const low = (o || '').toLowerCase();
-      return low.includes('facebook') || low.includes('fb') || low.includes('meta') ||
-             low.includes('insta') || low.includes('ig') || 
-             low.includes('site') || low.includes('orgânico') || low.includes('organico') || low.includes('seo') ||
-             low.includes('whatsapp') || low.includes('whats') || low.includes('wpp');
+      return o.includes('facebook') || o.includes('fb') || o.includes('meta') ||
+             o.includes('insta') || o.includes('ig') || 
+             o.includes('site') || o.includes('orgânico') || o.includes('organico') || o.includes('seo') ||
+             o.includes('whatsapp') || o.includes('whats') || o.includes('wpp');
     };
 
     let rCount = 0;
@@ -566,16 +482,11 @@ export function useInternoDashboard(filters: DashboardFilters) {
     const hottestLeadsList: any[] = [];
 
     leadsData.forEach(lead => {
-      let score = leadHottestStatusMap.get(String(lead.id)) || 0;
-      
-      const st = (lead.status_atual || '').toLowerCase();
-      if (st.match(/venda|contrato|fechado/)) score = Math.max(score, 4);
-      else if (st.match(/proposta|negocia/)) score = Math.max(score, 3);
-      else if (st.match(/visita/)) score = Math.max(score, 2);
-      else if (st.match(/agendam|agendado/)) score = Math.max(score, 1);
-
+      const score = leadHottestStatus.get(String(lead.id)) || 0;
       if (score >= 4) {
-        rCount++;
+        if (isAllowedVendaOrigin(lead.origin_treated)) {
+           rCount++;
+        }
       }
       if (score >= 3) pCount++;
       if (score >= 2) vCount++;
@@ -608,6 +519,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
     const monthsSet = new Set<string>();
     const monthRawMap = new Map<string, string>();
 
+    const hasSpecificCompetences = filters.competences && filters.competences.length > 0 && !filters.competences.includes('Atual');
     const selectedMonthStrings = hasSpecificCompetences ? (filters.competences || []).map(c => c.substring(0, 7)) : [];
 
     snapshotDataAll.forEach((row: any) => {
@@ -615,8 +527,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
       if (!activeLeadIds.has(stringifiedLeadId)) return; // FILTER BY ACTIVE LEADS
 
       const status = row.status_final_mes || 'Sem Status';
-      const statusLower = status.toLowerCase();
-      if (statusLower === 'ação de marketing' || statusLower === 'acao de marketing') return; // exclude
+      if (status.toLowerCase().includes('ação') || status.toLowerCase().includes('acao')) return; // exclude
       
       if (activeFilter.status && status !== activeFilter.status) return; // INTERACTIVE STATUS FILTER
 
