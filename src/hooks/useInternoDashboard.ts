@@ -156,7 +156,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
                  let leadsQuery = supabase
                    .from('leads')
                    .select('status_atual, nome, id_cv, data_criacao_cv, origem, motivo_cancelamento, corretor, empreendimento')
-                   .in('id_cv', chunk);
+                   .in('id_cv', chunk)
+                   .gte('data_criacao_cv', startDateStr)
+                   .lte('data_criacao_cv', endDateStr);
 
                  leadsQuery = applyProjectFilter(leadsQuery);
                  if (filters.broker !== 'Todos') {
