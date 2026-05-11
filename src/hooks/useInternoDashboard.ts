@@ -510,10 +510,27 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
     const leadOriginMap = new Map<string, string>();
     let descartadosCount = 0;
+    let eCount = 0;
+    let aCount = 0;
+    let vCount = 0;
+    let pCount = 0;
+    let rCount = 0;
+    
     leadsData.forEach(l => {
       leadOriginMap.set(String(l.id), (l.origem || '').toLowerCase());
-      if (l.status_atual?.toLowerCase().includes('descartad')) {
+      const st = (l.status_atual || '').toLowerCase();
+      if (st.includes('descartad')) {
          descartadosCount++;
+      } else if (st.includes('atendimento')) {
+         eCount++;
+      } else if (st.includes('agendam') || st.includes('agendado')) {
+         aCount++;
+      } else if (st.includes('visita')) {
+         vCount++;
+      } else if (st.includes('proposta') || st.includes('negocia')) {
+         pCount++;
+      } else if (st.includes('venda') || st.includes('contrato')) {
+         rCount++;
       }
     });
 
@@ -524,23 +541,10 @@ export function useInternoDashboard(filters: DashboardFilters) {
              o.includes('whatsapp') || o.includes('whats') || o.includes('wpp');
     };
 
-    let rCount = 0;
-    let pCount = 0;
-    let vCount = 0;
-    let aCount = 0;
-    
     const hottestLeadsList: any[] = [];
 
     leadsData.forEach(lead => {
       const score = leadHottestStatus.get(String(lead.id)) || 0;
-      if (score >= 4) {
-        if (isAllowedVendaOrigin(lead.origin_treated)) {
-           rCount++;
-        }
-      }
-      if (score >= 3) pCount++;
-      if (score >= 2) vCount++;
-      if (score >= 1) aCount++;
       
       if (score >= 1) {
         let maxStep = 'Agendamento';
@@ -560,7 +564,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
       }
     });
 
-    const hottestStatusData = { visita: vCount, agendamento: aCount, proposta: pCount, venda: rCount, descartado: descartadosCount };
+    const hottestStatusData = { emAtendimento: eCount, visita: vCount, agendamento: aCount, proposta: pCount, venda: rCount, descartado: descartadosCount };
 
 
     // Snapshots Processing
