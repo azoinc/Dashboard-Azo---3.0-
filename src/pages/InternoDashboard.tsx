@@ -315,27 +315,33 @@ export default function InternoDashboard({ onBack }: Props) {
   const displayEmAtendimentoNum = hottestStatusData.emAtendimento || 0;
   const displayEmAtendimento = displayEmAtendimentoNum.toLocaleString('pt-BR');
   
-  const displayAgendamentoCountNum = hottestStatusData.agendamento;
+  const displayAgendamentoCountNum = hottestStatusData.agendamento || 0;
   const displayAgendamentoCount = displayAgendamentoCountNum.toLocaleString('pt-BR');
   
-  const displayVisitaCountNum = hottestStatusData.visita;
+  const displayVisitaCountNum = hottestStatusData.visita || 0;
   const displayVisitaCount = displayVisitaCountNum.toLocaleString('pt-BR');
   
-  const displayVendaCountNum = hottestStatusData.venda;
+  const displayReservaCountNum = hottestStatusData.reserva || 0;
+  const displayReservaCount = displayReservaCountNum.toLocaleString('pt-BR');
+  
+  const displayVendaCountNum = hottestStatusData.venda || 0;
   const displayVendaCount = displayVendaCountNum.toLocaleString('pt-BR');
+
+  const displayPropostaCountNum = hottestStatusData.proposta || 0;
 
   const kpiQualificados = displayTotalLeadsNum - displayDescartadosCountNum;
   const pctDescartes = displayTotalLeadsNum > 0 ? ((displayDescartadosCountNum / displayTotalLeadsNum) * 100).toFixed(1) : '0';
   const pctEmAtendimento = displayTotalLeadsNum > 0 ? ((displayEmAtendimentoNum / displayTotalLeadsNum) * 100).toFixed(1) : '0';
   
-  const displayPropostaCountNum = hottestStatusData.proposta || 0;
   const cumulativeVenda = displayVendaCountNum;
-  const cumulativeVisita = displayVisitaCountNum + cumulativeVenda + displayPropostaCountNum;
+  const cumulativeReserva = displayReservaCountNum + cumulativeVenda;
+  const cumulativeVisita = displayVisitaCountNum + cumulativeReserva + displayPropostaCountNum;
   const cumulativeAgendamento = displayAgendamentoCountNum + cumulativeVisita;
   
   const pctAgendamentos = kpiQualificados > 0 ? ((cumulativeAgendamento / kpiQualificados) * 100).toFixed(1) : '0';
   const pctVisitas = cumulativeAgendamento > 0 ? ((cumulativeVisita / cumulativeAgendamento) * 100).toFixed(1) : '0';
-  const pctVendas = cumulativeVisita > 0 ? ((cumulativeVenda / cumulativeVisita) * 100).toFixed(1) : '0';
+  const pctReservas = cumulativeVisita > 0 ? ((cumulativeReserva / cumulativeVisita) * 100).toFixed(1) : '0';
+  const pctVendas = cumulativeReserva > 0 ? ((cumulativeVenda / cumulativeReserva) * 100).toFixed(1) : '0';
 
   const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#eab308', '#ec4899', '#f43f5e', '#84cc16'];
 
@@ -493,7 +499,7 @@ export default function InternoDashboard({ onBack }: Props) {
         {activeTab === 'gerais' && (
           <div className="space-y-6 max-w-7xl mx-auto">
             {/* Top Row: Big Numbers */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
               <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
                 <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Leads Totais</p>
                 <p className="text-3xl font-bold text-white">{displayTotalLeads}</p>
@@ -530,9 +536,16 @@ export default function InternoDashboard({ onBack }: Props) {
                 </p>
               </div>
               <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
+                <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Reservas</p>
+                <p className="text-3xl font-bold text-white">{displayReservaCount}</p>
+                <p className="mt-2 text-[10px] text-white/50 bg-black/20 px-2 py-1 rounded-full whitespace-nowrap" title="Calculado sobre visitas">
+                  Ref: <strong className="text-white">35%</strong> • Real: <strong className="text-white">{pctReservas}%</strong>
+                </p>
+              </div>
+              <div className="bg-[#61072E] p-6 rounded-2xl shadow-sm text-center flex flex-col justify-center items-center">
                 <p className="text-white/70 text-xs font-medium mb-1 uppercase tracking-wider">Vendas Realizadas</p>
                 <p className="text-3xl font-bold text-white">{displayVendaCount}</p>
-                <p className="mt-2 text-[10px] text-white/50 bg-black/20 px-2 py-1 rounded-full whitespace-nowrap" title="Calculado sobre visitas">
+                <p className="mt-2 text-[10px] text-white/50 bg-black/20 px-2 py-1 rounded-full whitespace-nowrap" title="Calculado sobre reservas">
                   Ref: <strong className="text-white">1%</strong> • Real: <strong className="text-white">{pctVendas}%</strong>
                 </p>
               </div>
