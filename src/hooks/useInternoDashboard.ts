@@ -31,16 +31,22 @@ export function normalizeStatus(rawStatus: string | null | undefined): string {
     let st = (rawStatus || 'Sem Status').trim();
     const stLower = st.toLowerCase();
     
-    if (stLower.includes('atendimento i.a') || stLower.includes('atendimento ia')) {
-        return 'Em Atendimento I.A.';
-    } else if (stLower.includes('aguardando atendimento do corretor') || stLower.includes('fila do corretor')) {
-        return 'Aguardando Atendimento do Corretor';
+    if (stLower.includes('atendimento i.a') || stLower.includes('atendimentoi.a') || stLower.includes('atendimento ia')) {
+        return 'Em AtendimentoI.A.';
+    } else if (stLower.includes('aguardando atendimento do corretor') || stLower.includes('aguardando atendimento corretor') || stLower.includes('fila do corretor')) {
+        return 'Aguardando Atendimento Corretor';
     } else if (stLower.includes('aguardando atendimento') && !stLower.includes('corretor')) {
         return 'Aguardando Atendimento';
     } else if (stLower === 'em atendimento') {
         return 'Em Atendimento';
+    } else if (stLower.includes('3ºtentativa') || stLower.includes('3 tentativa') || stLower.includes('3. tentativa') || stLower.includes('terceira tentativa')) {
+        return '3ºTentativa';
+    } else if (stLower.includes('2ºtentativa') || stLower.includes('2 tentativa') || stLower.includes('2. tentativa') || stLower.includes('segunda tentativa')) {
+        return '2ºTentativa';
     } else if (stLower.includes('agendado') || stLower.includes('agendamento')) {
         return 'Agendamento';
+    } else if (stLower.includes('reserva')) {
+        return 'Com Reserva';
     } else if (stLower.includes('visita')) {
         return 'Visita Realizada';
     } else if (stLower.includes('proposta') || stLower.includes('negocia')) {
@@ -562,14 +568,17 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
     const funnelStepsCount: Record<string, number> = {
       '00. Total de Leads': leadsData.length,
-      '06. Em Atendimento I.A.': 0,
-      '07. Aguardando Atend. do Corretor': 0,
-      '08. Aguardando Atendimento': 0,
-      '09. Em Atendimento': 0,
-      '10. Agendamento': 0,
-      '11. Visita Realizada': 0,
-      '12. Proposta / Negociação': 0,
-      '13. Venda Realizada': 0
+      '01. Em AtendimentoI.A.': 0,
+      '02. Aguardando Atendimento Corretor': 0,
+      '03. Aguardando Atendimento': 0,
+      '04. Em Atendimento': 0,
+      '05. 2ºTentativa': 0,
+      '06. 3ºTentativa': 0,
+      '07. Agendamento': 0,
+      '08. Visita Realizada': 0,
+      '09. Proposta / Negociação': 0,
+      '10. Com Reserva': 0,
+      '11. Venda Realizada': 0
     };
 
     let descartadosCount = 0;
@@ -583,28 +592,30 @@ export function useInternoDashboard(filters: DashboardFilters) {
     leadsData.forEach(l => {
       leadOriginMap.set(String(l.id), (l.origem || '').toLowerCase());
       const st = l.status_atual || 'Sem Status';
-      const stLower = st.toLowerCase().trim();
       
-      if (st === 'Em Atendimento I.A.') funnelStepsCount['06. Em Atendimento I.A.']++;
-      else if (st === 'Aguardando Atendimento do Corretor') funnelStepsCount['07. Aguardando Atend. do Corretor']++;
-      else if (st === 'Aguardando Atendimento') funnelStepsCount['08. Aguardando Atendimento']++;
-      else if (st === 'Em Atendimento') funnelStepsCount['09. Em Atendimento']++;
-      else if (st === 'Agendamento') funnelStepsCount['10. Agendamento']++;
-      else if (st === 'Visita Realizada') funnelStepsCount['11. Visita Realizada']++;
-      else if (st === 'Proposta / Negociação') funnelStepsCount['12. Proposta / Negociação']++;
-      else if (st === 'Venda Realizada') funnelStepsCount['13. Venda Realizada']++;
+      if (st === 'Em AtendimentoI.A.') funnelStepsCount['01. Em AtendimentoI.A.']++;
+      else if (st === 'Aguardando Atendimento Corretor') funnelStepsCount['02. Aguardando Atendimento Corretor']++;
+      else if (st === 'Aguardando Atendimento') funnelStepsCount['03. Aguardando Atendimento']++;
+      else if (st === 'Em Atendimento') funnelStepsCount['04. Em Atendimento']++;
+      else if (st === '2ºTentativa') funnelStepsCount['05. 2ºTentativa']++;
+      else if (st === '3ºTentativa') funnelStepsCount['06. 3ºTentativa']++;
+      else if (st === 'Agendamento') funnelStepsCount['07. Agendamento']++;
+      else if (st === 'Visita Realizada') funnelStepsCount['08. Visita Realizada']++;
+      else if (st === 'Proposta / Negociação') funnelStepsCount['09. Proposta / Negociação']++;
+      else if (st === 'Com Reserva') funnelStepsCount['10. Com Reserva']++;
+      else if (st === 'Venda Realizada') funnelStepsCount['11. Venda Realizada']++;
 
-      if (stLower.includes('descartad')) {
+      if (st === 'Descartado') {
          descartadosCount++;
-      } else if (stLower.includes('atendimento')) {
+      } else if (st === 'Em Atendimento') {
          eCount++;
-      } else if (stLower.includes('agendamento') || stLower.includes('agendado')) {
+      } else if (st === 'Agendamento') {
          aCount++;
-      } else if (stLower.includes('visita')) {
+      } else if (st === 'Visita Realizada') {
          vCount++;
-      } else if (stLower.includes('proposta') || stLower.includes('negocia')) {
+      } else if (st === 'Proposta / Negociação') {
          pCount++;
-      } else if (stLower.includes('venda') || stLower.includes('contrato')) {
+      } else if (st === 'Venda Realizada') {
          rCount++;
       }
     });
