@@ -518,12 +518,12 @@ export function useInternoDashboard(filters: DashboardFilters) {
     
     leadsData.forEach(l => {
       leadOriginMap.set(String(l.id), (l.origem || '').toLowerCase());
-      const st = (l.status_atual || '').toLowerCase();
+      const st = (l.status_atual || '').toLowerCase().trim();
       if (st.includes('descartad')) {
          descartadosCount++;
-      } else if (st.includes('atendimento')) {
+      } else if (st === 'em atendimento') {
          eCount++;
-      } else if (st.includes('agendam') || st.includes('agendado')) {
+      } else if (st === 'agendamento' || st === 'agendado' || st.includes('agendam')) {
          aCount++;
       } else if (st.includes('visita')) {
          vCount++;
