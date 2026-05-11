@@ -396,7 +396,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
   const computed = useMemo(() => {
     if (!rawData) {
       return {
-        statusData: [], funnelData: [], stackedStatusData: [], availableMonths: [],
+        statusData: [], funnelData: [], stackedStatusData: [], stackedChartStatuses: [], availableMonths: [],
         brokerTimeData: [], brokerActionsData: [], originData: [], cancelReasons: [],
         brokerLeads: [], lineData: [], lineChartKeys: [], totalLeads: 0,
         hottestStatusData: { visita: 0, agendamento: 0, proposta: 0, venda: 0 },
@@ -776,7 +776,6 @@ export function useInternoDashboard(filters: DashboardFilters) {
           obj[status] = count;
         }
       });
-      obj.total = total;
       return obj;
     });
 
