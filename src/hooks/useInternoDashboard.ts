@@ -169,13 +169,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
                  const { data, error } = await leadsQuery;
                  if (error) throw error;
                  if (data) {
-                    // CRITICAL FIX: To prevent larger numbers, we only include leads that were ACTUALLY CREATED in the selected competence months.
-                    // This implements a Cohort (Safra) analysis correctly.
-                    const cohortFilteredData = data.filter((lead: any) => {
-                       const leadCreationMonth = lead.data_criacao_cv?.substring(0, 7);
-                       return leadCreationMonth && selectedMonthStrings.includes(leadCreationMonth);
-                    });
-                    rawLeadsData.push(...cohortFilteredData);
+                    rawLeadsData.push(...data);
                  }
               }
            }
