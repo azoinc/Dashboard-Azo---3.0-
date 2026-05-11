@@ -27,6 +27,32 @@ export interface DashboardFilters {
   };
 }
 
+export function normalizeStatus(rawStatus: string | null | undefined): string {
+    let st = (rawStatus || 'Sem Status').trim();
+    const stLower = st.toLowerCase();
+    
+    if (stLower.includes('atendimento i.a') || stLower.includes('atendimento ia')) {
+        return 'Em Atendimento I.A.';
+    } else if (stLower.includes('aguardando atendimento do corretor') || stLower.includes('fila do corretor')) {
+        return 'Aguardando Atendimento do Corretor';
+    } else if (stLower.includes('aguardando atendimento') && !stLower.includes('corretor')) {
+        return 'Aguardando Atendimento';
+    } else if (stLower === 'em atendimento') {
+        return 'Em Atendimento';
+    } else if (stLower.includes('agendado') || stLower.includes('agendamento')) {
+        return 'Agendamento';
+    } else if (stLower.includes('visita')) {
+        return 'Visita Realizada';
+    } else if (stLower.includes('proposta') || stLower.includes('negocia')) {
+        return 'Proposta / Negociação';
+    } else if (stLower.includes('venda') || stLower.includes('contrato')) {
+        return 'Venda Realizada';
+    } else if (stLower.includes('descartad')) {
+        return 'Descartado';
+    }
+    return st;
+}
+
 export function useInternoDashboard(filters: DashboardFilters) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -212,17 +238,21 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
         leadsData = (rawLeadsData || [])
            .filter((item: any) => !excludedLeadIds.has(String(item.id_cv)))
-           .map((item: any) => ({
-             status_atual: item.status_atual,
-             id: String(item.id_cv),
-             nome: item.nome,
-             lead_data_cad: item.data_criacao_cv,
-             origem: item.origem,
-             motivo_cancelamento: item.motivo_cancelamento,
-             corretor: item.corretor,
-             empreendimento: item.empreendimento,
-             update_at: item.update_at
-           }));
+           .map((item: any) => {
+             const st = normalizeStatus(item.status_atual);
+
+             return {
+               status_atual: st,
+               id: String(item.id_cv),
+               nome: item.nome,
+               lead_data_cad: item.data_criacao_cv,
+               origem: item.origem,
+               motivo_cancelamento: item.motivo_cancelamento,
+               corretor: item.corretor,
+               empreendimento: item.empreendimento,
+               update_at: item.update_at
+             };
+           });
 
         let funnelRes = { data: [] as any[], error: null };
         let snapshotRes: any[] = [];
@@ -399,6 +429,38 @@ export function useInternoDashboard(filters: DashboardFilters) {
        leadsData = leadsData.filter(l => l.motivo_cancelamento_treated === activeFilter.cancelReason);
     }
 
+    if (activeFilter.status && activeFilter.month) {
+       const snapshotDataAll = rawData.snapshotRes.flatMap((res: any) => res.data || []);
+       const matchingLeadIds = new Set<string>();
+       
+       snapshotDataAll.forEach((row: any) => {
+          const compData = row.competencia_data;
+          if (!compData) return;
+          
+          let monthStr = compData;
+          if (typeof compData === 'string' && compData.length >= 7) {
+            const parts = compData.substring(0, 10).split('-');
+            if (parts.length >= 2) {
+               const year = parts[0];
+               const monthNum = parseInt(parts[1], 10);
+               const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+               if (monthNum >= 1 && monthNum <= 12) {
+                   monthStr = `${monthNames[monthNum - 1]} ${year}`;
+               }
+            }
+          }
+          const status = normalizeStatus(row.status_final_mes);
+          
+          if (monthStr === activeFilter.month && status === activeFilter.status) {
+             matchingLeadIds.add(String(row.lead_id));
+          }
+       });
+       
+       leadsData = leadsData.filter(l => matchingLeadIds.has(String(l.id)));
+    } else if (activeFilter.status) {
+       leadsData = leadsData.filter(l => (l.status_atual || 'Sem Status') === activeFilter.status);
+    }
+
     if (filters.origin && filters.origin !== 'Todas') {
        leadsData = leadsData.filter(l => l.origin_treated === filters.origin);
     }
@@ -472,7 +534,6 @@ export function useInternoDashboard(filters: DashboardFilters) {
     const lineChartKeys = Object.entries(empTotals).sort((a, b) => b[1] - a[1]).map(e => e[0]);
 
     // Funnel Processing
-    const funnelCounts: Record<string, Set<string>> = {};
     const leadHottestStatus = new Map<string, number>();
 
     if (!rawData.funnelRes.error && rawData.funnelRes.data) {
@@ -483,9 +544,6 @@ export function useInternoDashboard(filters: DashboardFilters) {
         const etapa = row.etapa_visual;
         if (etapa && leadId && leadId !== 'null' && leadId !== 'undefined') {
           if (etapa.toLowerCase().includes('ação') || etapa.toLowerCase().includes('acao')) return;
-
-          if (!funnelCounts[etapa]) funnelCounts[etapa] = new Set();
-          funnelCounts[etapa].add(leadId);
 
           const fase = etapa.toLowerCase();
           let score = 0;
@@ -502,38 +560,62 @@ export function useInternoDashboard(filters: DashboardFilters) {
       });
     }
 
-    const funnelData = Object.entries(funnelCounts)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([name, dataSet]) => ({ name, value: dataSet.size }));
-      
-    const totalStage = funnelData.find((item: any) => item.name.includes('Total de Leads'));
-    const totalLeads = leadsData.length;
+    const funnelStepsCount: Record<string, number> = {
+      '00. Total de Leads': leadsData.length,
+      '06. Em Atendimento I.A.': 0,
+      '07. Aguardando Atend. do Corretor': 0,
+      '08. Aguardando Atendimento': 0,
+      '09. Em Atendimento': 0,
+      '10. Agendamento': 0,
+      '11. Visita Realizada': 0,
+      '12. Proposta / Negociação': 0,
+      '13. Venda Realizada': 0
+    };
 
-    const leadOriginMap = new Map<string, string>();
     let descartadosCount = 0;
     let eCount = 0;
     let aCount = 0;
     let vCount = 0;
     let pCount = 0;
     let rCount = 0;
-    
+    const leadOriginMap = new Map<string, string>();
+
     leadsData.forEach(l => {
       leadOriginMap.set(String(l.id), (l.origem || '').toLowerCase());
-      const st = (l.status_atual || '').toLowerCase().trim();
-      if (st.includes('descartad')) {
+      const st = l.status_atual || 'Sem Status';
+      const stLower = st.toLowerCase().trim();
+      
+      if (st === 'Em Atendimento I.A.') funnelStepsCount['06. Em Atendimento I.A.']++;
+      else if (st === 'Aguardando Atendimento do Corretor') funnelStepsCount['07. Aguardando Atend. do Corretor']++;
+      else if (st === 'Aguardando Atendimento') funnelStepsCount['08. Aguardando Atendimento']++;
+      else if (st === 'Em Atendimento') funnelStepsCount['09. Em Atendimento']++;
+      else if (st === 'Agendamento') funnelStepsCount['10. Agendamento']++;
+      else if (st === 'Visita Realizada') funnelStepsCount['11. Visita Realizada']++;
+      else if (st === 'Proposta / Negociação') funnelStepsCount['12. Proposta / Negociação']++;
+      else if (st === 'Venda Realizada') funnelStepsCount['13. Venda Realizada']++;
+
+      if (stLower.includes('descartad')) {
          descartadosCount++;
-      } else if (st === 'em atendimento') {
+      } else if (stLower.includes('atendimento')) {
          eCount++;
-      } else if (st === 'agendamento' || st === 'agendado' || st.includes('agendam')) {
+      } else if (stLower.includes('agendamento') || stLower.includes('agendado')) {
          aCount++;
-      } else if (st.includes('visita')) {
+      } else if (stLower.includes('visita')) {
          vCount++;
-      } else if (st.includes('proposta') || st.includes('negocia')) {
+      } else if (stLower.includes('proposta') || stLower.includes('negocia')) {
          pCount++;
-      } else if (st.includes('venda') || st.includes('contrato')) {
+      } else if (stLower.includes('venda') || stLower.includes('contrato')) {
          rCount++;
       }
     });
+
+    const funnelData = Object.entries(funnelStepsCount)
+      .filter(([name, value]) => value > 0 || name.includes('Total') || name.includes('Em Atendimento'))
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([name, value]) => ({ name, value }));
+      
+    const totalStage = funnelData.find((item: any) => item.name.includes('Total de Leads'));
+    const totalLeads = leadsData.length;
 
     const isAllowedVendaOrigin = (o: string) => {
       return o.includes('facebook') || o.includes('fb') || o.includes('meta') ||
@@ -595,7 +677,9 @@ export function useInternoDashboard(filters: DashboardFilters) {
       const stringifiedLeadId = String(row.lead_id);
       if (!activeLeadIds.has(stringifiedLeadId)) return; // FILTER BY ACTIVE LEADS
 
-      const status = row.status_final_mes || 'Sem Status';
+      let status = row.status_final_mes || 'Sem Status';
+      status = normalizeStatus(status);
+      
       if (status.toLowerCase().includes('ação') || status.toLowerCase().includes('acao')) return; // exclude
       
       if (activeFilter.status && status !== activeFilter.status) return; // INTERACTIVE STATUS FILTER
