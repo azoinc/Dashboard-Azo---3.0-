@@ -289,10 +289,36 @@ export function useInternoDashboard(filters: DashboardFilters) {
              }));
            }
            
-           funnelRes = { 
-             data: funnelResponses.flatMap(r => r.data || []), 
-             error: funnelResponses.find(r => r.error)?.error || null 
-           };
+           if (hasSpecificCompetences) {
+             const syntheticFunnelData: any[] = [];
+             leadsData.forEach(lead => {
+               const st = String(lead.status_atual).toLowerCase();
+               const stringLeadId = lead.id;
+               
+               syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '1. Total de Leads' });
+               if (!st.includes('aguardando')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '2. Em Atendimento' });
+               }
+               if (st.includes('agendam') || st.includes('agendado') || st.includes('visita') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '3. Agendamento' });
+               }
+               if (st.includes('visita') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '4. Visita' });
+               }
+               if (st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '5. Proposta/Negociação' });
+               }
+               if (st.includes('venda') || st.includes('contrato')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '6. Vendas' });
+               }
+             });
+             funnelRes = { data: syntheticFunnelData, error: null };
+           } else {
+             funnelRes = { 
+               data: funnelResponses.flatMap(r => r.data || []), 
+               error: funnelResponses.find(r => r.error)?.error || null 
+             };
+           }
            
            snapshotRes = snapshotResponses;
            tmaData = tmaResponses.flatMap(r => r.data || []);
