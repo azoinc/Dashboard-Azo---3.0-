@@ -289,7 +289,7 @@ export default function InternoDashboard({ onBack }: Props) {
   const [allLeadsPage, setAllLeadsPage] = useState(1);
 
   const { 
-    loading, error, statusData, funnelData, stackedStatusData, availableMonths, brokerTimeData, brokerActionsData, 
+    loading, error, statusData, funnelData, stackedStatusData, stackedChartStatuses, availableMonths, brokerTimeData, brokerActionsData, 
     originData, cancelReasons, brokerLeads, lineData, lineChartKeys, totalLeads, hottestStatusData, hottestLeadsList,
     allLeadsList, hasSpecificCompetences, globalAvailableStatuses
   } = useInternoDashboard({ ...filters, interactiveFilters });
@@ -297,6 +297,7 @@ export default function InternoDashboard({ onBack }: Props) {
   const displayStatusData = statusData;
   const displayFunnelData = funnelData;
   const displayStackedStatusData = stackedStatusData;
+  const displayStackedChartStatuses = stackedChartStatuses;
   const displayAvailableMonths = availableMonths;
   const displayBrokerTime = brokerTimeData;
   const displayBrokerActions = brokerActionsData;
@@ -558,20 +559,20 @@ export default function InternoDashboard({ onBack }: Props) {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={displayStackedStatusData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                    <XAxis dataKey="status" stroke="#94a3b8" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={80} interval={0} />
+                    <XAxis dataKey="month" stroke="#94a3b8" tick={<CustomXAxisTick />} tickLine={false} axisLine={false} height={80} interval={0} />
                     <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend wrapperStyle={{ fontSize: '12px', color: '#94a3b8' }} verticalAlign="top" height={36} />
-                    {displayAvailableMonths.map((month, idx) => (
+                    {displayStackedChartStatuses?.map((status: string, idx: number) => (
                       <Bar 
-                        key={month} 
-                        dataKey={month} 
+                        key={status} 
+                        dataKey={status} 
                         stackId="a" 
                         fill={COLORS[idx % COLORS.length]} 
                         onClick={(data) => setInteractiveFilters(prev => ({ 
                           ...prev, 
-                          month: prev.month === month && prev.status === data.status ? undefined : month, 
-                          status: prev.month === month && prev.status === data.status ? undefined : data.status 
+                          month: prev.month === data.month && prev.status === status ? undefined : data.month, 
+                          status: prev.month === data.month && prev.status === status ? undefined : status 
                         }))}
                         className="cursor-pointer hover:opacity-80 transition-opacity"
                         style={{ cursor: 'pointer' }}
