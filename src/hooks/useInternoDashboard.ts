@@ -267,7 +267,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
         if (leadsData && leadsData.length > 0) {
            const leadIds = leadsData.map(l => l.id);
-           const chunkSize = 1000;
+           const chunkSize = 50;
            const snapshotPromises = [];
            const funnelPromises = [];
            const tmaPromises = [];
@@ -430,8 +430,17 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
     const globalAvailableStatuses = Array.from(new Set(leadsData.map(l => l.status_atual || 'Sem Status'))).sort();
 
+    // Global non-interactive filters
+    if (filters.origin && filters.origin !== 'Todas') {
+       leadsData = leadsData.filter(l => l.origin_treated === filters.origin);
+    }
+    if (filters.status && filters.status !== 'Todos') {
+       leadsData = leadsData.filter(l => (l.status_atual || 'Sem Status') === filters.status);
+    }
+
     const activeFilter = filters.interactiveFilters || {};
     
+    // Interactive filters (origin and cancel reason)
     if (activeFilter.origin) {
        leadsData = leadsData.filter(l => l.origin_treated === activeFilter.origin);
     }
@@ -439,6 +448,11 @@ export function useInternoDashboard(filters: DashboardFilters) {
        leadsData = leadsData.filter(l => l.motivo_cancelamento_treated === activeFilter.cancelReason);
     }
 
+    // Capture the state of leads BEFORE we apply the month/status interactive filters.
+    // This allows the stacked bar chart to remain un-collapsed when you click on one of its bars.
+    const leadsWithoutMonthStatusFilterIds = new Set(leadsData.map(l => String(l.id)));
+
+    // Interactive filters (month and status)
     if (activeFilter.month) {
        const snapshotDataAll = rawData.snapshotRes.flatMap((res: any) => res.data || []);
        const matchingLeadIds = new Set<string>();
@@ -483,14 +497,6 @@ export function useInternoDashboard(filters: DashboardFilters) {
        leadsData = leadsData.filter(l => (l.status_atual || 'Sem Status') === activeFilter.status);
     }
 
-    if (filters.origin && filters.origin !== 'Todas') {
-       leadsData = leadsData.filter(l => l.origin_treated === filters.origin);
-    }
-
-    if (filters.status && filters.status !== 'Todos') {
-       leadsData = leadsData.filter(l => (l.status_atual || 'Sem Status') === filters.status);
-    }
-    
     // Create an set of active lead IDs
     const activeLeadIds = new Set(leadsData.map(l => String(l.id)));
 
@@ -707,15 +713,13 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
     snapshotDataAll.forEach((row: any) => {
       const stringifiedLeadId = String(row.lead_id);
-      if (!activeLeadIds.has(stringifiedLeadId)) return; // FILTER BY ACTIVE LEADS
+      if (!leadsWithoutMonthStatusFilterIds.has(stringifiedLeadId)) return; // FILTER BY ACTIVE LEADS (excluding month/status interactive filters)
 
       let status = row.status_final_mes || 'Sem Status';
       status = normalizeStatus(status);
       
       if (status.toLowerCase().includes('ação') || status.toLowerCase().includes('acao')) return; // exclude
       
-      if (activeFilter.status && status !== activeFilter.status) return; // INTERACTIVE STATUS FILTER
-
       const compData = row.competencia_data;
       if (!compData) return;
       
@@ -737,8 +741,6 @@ export function useInternoDashboard(filters: DashboardFilters) {
         }
       }
       
-      if (activeFilter.month && monthStr !== activeFilter.month) return; // INTERACTIVE MONTH FILTER
-
       monthsSet.add(monthStr);
       monthRawMap.set(monthStr, compData);
       
