@@ -156,7 +156,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
                  const chunk = validLeadIds.slice(i, i + chunkSize);
                  let leadsQuery = supabase
                    .from('leads')
-                   .select('status_atual, nome, id_cv, data_criacao_cv, origem, motivo_cancelamento, corretor, empreendimento')
+                   .select('status_atual, nome, id_cv, data_criacao_cv, origem, motivo_cancelamento, corretor, empreendimento, update_at')
                    .in('id_cv', chunk)
                    .gte('data_criacao_cv', startDateStr)
                    .lte('data_criacao_cv', endDateStr);
@@ -176,7 +176,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
         } else {
            let leadsQuery = supabase
              .from('leads')
-             .select('status_atual, nome, id_cv, data_criacao_cv, origem, motivo_cancelamento, corretor, empreendimento')
+             .select('status_atual, nome, id_cv, data_criacao_cv, origem, motivo_cancelamento, corretor, empreendimento, update_at')
              .gte('data_criacao_cv', startDateStr)
              .lte('data_criacao_cv', endDateStr);
 
@@ -220,7 +220,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
              origem: item.origem,
              motivo_cancelamento: item.motivo_cancelamento,
              corretor: item.corretor,
-             empreendimento: item.empreendimento
+             empreendimento: item.empreendimento,
+             update_at: item.update_at
            }));
 
         let funnelRes = { data: [] as any[], error: null };
@@ -277,10 +278,10 @@ export function useInternoDashboard(filters: DashboardFilters) {
                 }
              });
 
-             leadsData = leadsData.filter(l => validLeadsFromSnapshots.has(String(l.id))).map(l => ({
-               ...l,
-               status_atual: validLeadsFromSnapshots.get(String(l.id)) || l.status_atual
-             }));
+             // We only filter the leads to ensure they were active in the competence.
+             // We no longer OVERRIDE the status_atual with the snapshot status_final_mes,
+             // because the user's system report expects the CURRENT status for the metrics.
+             leadsData = leadsData.filter(l => validLeadsFromSnapshots.has(String(l.id)));
            }
            
            if (hasSpecificCompetences) {
@@ -536,12 +537,14 @@ export function useInternoDashboard(filters: DashboardFilters) {
     };
 
     const hottestLeadsList: any[] = [];
+    const allLeadsList: any[] = [];
 
     leadsData.forEach(lead => {
       const score = leadHottestStatus.get(String(lead.id)) || 0;
       
+      let maxStep = '-';
       if (score >= 1) {
-        let maxStep = 'Agendamento';
+        maxStep = 'Agendamento';
         if (score === 2) maxStep = 'Visita';
         if (score === 3) maxStep = 'Proposta';
         if (score === 4) maxStep = 'Venda';
@@ -553,9 +556,21 @@ export function useInternoDashboard(filters: DashboardFilters) {
           corretor: lead.corretor,
           maxStep,
           data_entrada: lead.lead_data_cad,
-          status_atual: lead.status_atual
+          status_atual: lead.status_atual,
+          data_update_status: lead.update_at
         });
       }
+
+      allLeadsList.push({
+        id: lead.id,
+        nome: lead.nome || 'Sem Nome',
+        empreendimento: lead.empreendimento,
+        corretor: lead.corretor,
+        maxStep,
+        data_entrada: lead.lead_data_cad,
+        status_atual: lead.status_atual,
+        data_update_status: lead.update_at
+      });
     });
 
     const hottestStatusData = { emAtendimento: eCount, visita: vCount, agendamento: aCount, proposta: pCount, venda: rCount, descartado: descartadosCount };
@@ -651,7 +666,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
       statusData, funnelData, stackedStatusData, availableMonths,
       brokerTimeData, brokerActionsData, originData, cancelReasons,
       brokerLeads, lineData: sortedLineData, lineChartKeys, totalLeads,
-      hottestStatusData, hottestLeadsList
+      hottestStatusData, hottestLeadsList, allLeadsList, hasSpecificCompetences
     };
   }, [rawData, filters.interactiveFilters]);
 
