@@ -78,7 +78,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
         let endDate = new Date();
 
         if (filters.period === 'Todo o período') {
-          startDate = new Date(2026, 0, 1);
+          startDate = new Date(2020, 0, 1);
         } else if (filters.period === 'Últimos 30 dias') {
           startDate.setDate(now.getDate() - 30);
         } else if (filters.period === 'Este mês' || filters.period === 'Mês Atual') {
@@ -93,7 +93,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
           startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         }
 
-        const globalMinDate = new Date(2026, 0, 1);
+        const globalMinDate = new Date(2020, 0, 1);
         if (startDate < globalMinDate) startDate = globalMinDate;
 
         const formatYYYYMMDDEnd = (date: Date) => {
@@ -138,6 +138,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
            const compStartStr = compStartDate.toISOString().split('T')[0];
            const compEndStr = compEndDate.toISOString().split('T')[0];
+           const selectedMonthStrings = (filters.competences || []).map(c => c.substring(0, 7)); // YYYY-MM
 
            const { data: snapIds, error: snapErr } = await supabase
              .from('view_lead_snapshot_mensal')
@@ -167,7 +168,15 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
                  const { data, error } = await leadsQuery;
                  if (error) throw error;
-                 if (data) rawLeadsData.push(...data);
+                 if (data) {
+                    // CRITICAL FIX: To prevent larger numbers, we only include leads that were ACTUALLY CREATED in the selected competence months.
+                    // This implements a Cohort (Safra) analysis correctly.
+                    const cohortFilteredData = data.filter((lead: any) => {
+                       const leadCreationMonth = lead.data_criacao_cv?.substring(0, 7);
+                       return leadCreationMonth && selectedMonthStrings.includes(leadCreationMonth);
+                    });
+                    rawLeadsData.push(...cohortFilteredData);
+                 }
               }
            }
         } else {
