@@ -278,6 +278,7 @@ export default function InternoDashboard({ onBack }: Props) {
     project: 'Todos', 
     broker: 'Todos',
     origin: 'Todas',
+    status: 'Todos',
     competences: ['Atual'],
     startDate: undefined as string | undefined,
     endDate: undefined as string | undefined
@@ -290,7 +291,7 @@ export default function InternoDashboard({ onBack }: Props) {
   const { 
     loading, error, statusData, funnelData, stackedStatusData, availableMonths, brokerTimeData, brokerActionsData, 
     originData, cancelReasons, brokerLeads, lineData, lineChartKeys, totalLeads, hottestStatusData, hottestLeadsList,
-    allLeadsList, hasSpecificCompetences
+    allLeadsList, hasSpecificCompetences, globalAvailableStatuses
   } = useInternoDashboard({ ...filters, interactiveFilters });
 
   const displayStatusData = statusData;
@@ -443,6 +444,19 @@ export default function InternoDashboard({ onBack }: Props) {
             <option value="Google">Google</option>
             <option value="Site">Site / Orgânico</option>
             <option value="Outros">Outros</option>
+          </select>
+        </div>
+
+        <div className="flex items-center space-x-2 text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+          <select 
+            className="bg-transparent border-none outline-none text-sm text-slate-900"
+            value={filters.status || 'Todos'}
+            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+          >
+            <option value="Todos">Todos os Status</option>
+            {globalAvailableStatuses?.map((st: string) => (
+              <option key={st} value={st}>{st}</option>
+            ))}
           </select>
         </div>
       </div>
