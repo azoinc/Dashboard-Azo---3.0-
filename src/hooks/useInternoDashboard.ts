@@ -388,6 +388,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
         return { ...lead, origin_treated: origin, motivo_cancelamento_treated: lead.motivo_cancelamento ? lead.motivo_cancelamento.trim() : null };
     });
 
+    const globalAvailableStatuses = Array.from(new Set(leadsData.map(l => l.status_atual || 'Sem Status'))).sort();
+
     const activeFilter = filters.interactiveFilters || {};
     
     if (activeFilter.origin) {
@@ -399,6 +401,10 @@ export function useInternoDashboard(filters: DashboardFilters) {
 
     if (filters.origin && filters.origin !== 'Todas') {
        leadsData = leadsData.filter(l => l.origin_treated === filters.origin);
+    }
+
+    if (filters.status && filters.status !== 'Todos') {
+       leadsData = leadsData.filter(l => (l.status_atual || 'Sem Status') === filters.status);
     }
     
     // Create an set of active lead IDs
@@ -666,9 +672,10 @@ export function useInternoDashboard(filters: DashboardFilters) {
       statusData, funnelData, stackedStatusData, availableMonths,
       brokerTimeData, brokerActionsData, originData, cancelReasons,
       brokerLeads, lineData: sortedLineData, lineChartKeys, totalLeads,
-      hottestStatusData, hottestLeadsList, allLeadsList, hasSpecificCompetences
+      hottestStatusData, hottestLeadsList, allLeadsList, hasSpecificCompetences,
+      globalAvailableStatuses
     };
-  }, [rawData, filters.interactiveFilters]);
+  }, [rawData, filters.interactiveFilters, filters.status]);
 
   return {
     loading,
