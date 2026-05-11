@@ -45,10 +45,10 @@ export function normalizeStatus(rawStatus: string | null | undefined): string {
         return '2ºTentativa';
     } else if (stLower.includes('agendado') || stLower.includes('agendamento')) {
         return 'Agendamento';
-    } else if (stLower.includes('reserva')) {
-        return 'Com Reserva';
     } else if (stLower.includes('visita')) {
         return 'Visita Realizada';
+    } else if (stLower.includes('reserva')) {
+        return 'Com Reserva';
     } else if (stLower.includes('proposta') || stLower.includes('negocia')) {
         return 'Proposta / Negociação';
     } else if (stLower.includes('venda') || stLower.includes('contrato')) {
@@ -314,10 +314,11 @@ export function useInternoDashboard(filters: DashboardFilters) {
                 }
              });
 
-             // We only filter the leads to ensure they were active in the competence.
-             // We no longer OVERRIDE the status_atual with the snapshot status_final_mes,
-             // because the user's system report expects the CURRENT status for the metrics.
-             leadsData = leadsData.filter(l => validLeadsFromSnapshots.has(String(l.id)));
+             // Override the status_atual with the snapshot status_final_mes so that 
+             // historical performance respects the historical state.
+             leadsData = leadsData
+                .filter(l => validLeadsFromSnapshots.has(String(l.id)))
+                .map(l => ({ ...l, status_atual: normalizeStatus(validLeadsFromSnapshots.get(String(l.id))) }));
            }
            
            if (hasSpecificCompetences) {
@@ -330,17 +331,20 @@ export function useInternoDashboard(filters: DashboardFilters) {
                if (!st.includes('aguardando')) {
                  syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '2. Em Atendimento' });
                }
-               if (st.includes('agendam') || st.includes('agendado') || st.includes('visita') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
+               if (st.includes('agendam') || st.includes('agendado') || st.includes('visita') || st.includes('reserva') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
                  syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '3. Agendamento' });
                }
-               if (st.includes('visita') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
-                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '4. Visita' });
+               if (st.includes('visita') || st.includes('reserva') || st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '4. Visita Realizada' });
                }
-               if (st.includes('proposta') || st.includes('negocia') || st.includes('venda') || st.includes('contrato')) {
-                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '5. Proposta/Negociação' });
+               if (st.includes('proposta') || st.includes('negocia') || st.includes('reserva') || st.includes('venda') || st.includes('contrato')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '5. Proposta / Negociação' });
+               }
+               if (st.includes('reserva') || st.includes('venda') || st.includes('contrato')) {
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '6. Com Reserva' });
                }
                if (st.includes('venda') || st.includes('contrato')) {
-                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '6. Vendas' });
+                 syntheticFunnelData.push({ lead_id: stringLeadId, etapa_visual: '7. Venda Realizada' });
                }
              });
              funnelRes = { data: syntheticFunnelData, error: null };
@@ -435,9 +439,10 @@ export function useInternoDashboard(filters: DashboardFilters) {
        leadsData = leadsData.filter(l => l.motivo_cancelamento_treated === activeFilter.cancelReason);
     }
 
-    if (activeFilter.status && activeFilter.month) {
+    if (activeFilter.month) {
        const snapshotDataAll = rawData.snapshotRes.flatMap((res: any) => res.data || []);
        const matchingLeadIds = new Set<string>();
+       const monthLeadStatuses = new Map<string, string>();
        
        snapshotDataAll.forEach((row: any) => {
           const compData = row.competencia_data;
@@ -457,12 +462,23 @@ export function useInternoDashboard(filters: DashboardFilters) {
           }
           const status = normalizeStatus(row.status_final_mes);
           
-          if (monthStr === activeFilter.month && status === activeFilter.status) {
-             matchingLeadIds.add(String(row.lead_id));
+          if (monthStr === activeFilter.month) {
+             if (activeFilter.status) {
+                 if (status === activeFilter.status) {
+                     matchingLeadIds.add(String(row.lead_id));
+                     monthLeadStatuses.set(String(row.lead_id), status);
+                 }
+             } else {
+                 matchingLeadIds.add(String(row.lead_id));
+                 monthLeadStatuses.set(String(row.lead_id), status);
+             }
           }
        });
        
-       leadsData = leadsData.filter(l => matchingLeadIds.has(String(l.id)));
+       leadsData = leadsData
+          .filter(l => matchingLeadIds.has(String(l.id)))
+          .map(l => ({ ...l, status_atual: monthLeadStatuses.get(String(l.id)) || l.status_atual }));
+
     } else if (activeFilter.status) {
        leadsData = leadsData.filter(l => (l.status_atual || 'Sem Status') === activeFilter.status);
     }
@@ -578,7 +594,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
       '08. Visita Realizada': 0,
       '09. Proposta / Negociação': 0,
       '10. Com Reserva': 0,
-      '11. Venda Realizada': 0
+      '11. Venda Realizada': 0,
+      '12. Descartado': 0
     };
 
     let descartadosCount = 0;
@@ -586,6 +603,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
     let aCount = 0;
     let vCount = 0;
     let pCount = 0;
+    let cCount = 0; // Com Reserva
     let rCount = 0;
     const leadOriginMap = new Map<string, string>();
 
@@ -604,6 +622,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
       else if (st === 'Proposta / Negociação') funnelStepsCount['09. Proposta / Negociação']++;
       else if (st === 'Com Reserva') funnelStepsCount['10. Com Reserva']++;
       else if (st === 'Venda Realizada') funnelStepsCount['11. Venda Realizada']++;
+      else if (st === 'Descartado') funnelStepsCount['12. Descartado']++;
 
       if (st === 'Descartado') {
          descartadosCount++;
@@ -615,6 +634,8 @@ export function useInternoDashboard(filters: DashboardFilters) {
          vCount++;
       } else if (st === 'Proposta / Negociação') {
          pCount++;
+      } else if (st === 'Com Reserva') {
+         cCount++;
       } else if (st === 'Venda Realizada') {
          rCount++;
       }
@@ -672,7 +693,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
       });
     });
 
-    const hottestStatusData = { emAtendimento: eCount, visita: vCount, agendamento: aCount, proposta: pCount, venda: rCount, descartado: descartadosCount };
+    const hottestStatusData = { emAtendimento: eCount, visita: vCount, proposta: pCount, reserva: cCount, agendamento: aCount, venda: rCount, descartado: descartadosCount };
 
 
     // Snapshots Processing
