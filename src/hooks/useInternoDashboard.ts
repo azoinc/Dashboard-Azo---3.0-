@@ -396,7 +396,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
   const computed = useMemo(() => {
     if (!rawData) {
       return {
-        statusData: [], funnelData: [], stackedStatusData: [], stackedChartStatuses: [], availableMonths: [],
+        statusData: [], funnelData: [], stackedStatusData: [], availableMonths: [],
         brokerTimeData: [], brokerActionsData: [], originData: [], cancelReasons: [],
         brokerLeads: [], lineData: [], lineChartKeys: [], totalLeads: 0,
         hottestStatusData: { visita: 0, agendamento: 0, proposta: 0, venda: 0 },
@@ -756,28 +756,17 @@ export function useInternoDashboard(filters: DashboardFilters) {
       return rawA.localeCompare(rawB);
     });
     
-    const usedStatusesSet = new Set<string>();
-    Array.from(stackedDataMap.entries()).forEach(([status, monthsMap]) => {
-      let statusTotal = 0;
-      availableMonths.forEach(month => {
-        statusTotal += monthsMap.get(month)?.size || 0;
-      });
-      if (statusTotal > 0) usedStatusesSet.add(status);
-    });
-    
-    const usedStatuses = Array.from(usedStatusesSet).sort();
-
-    const stackedStatusData = availableMonths.map(month => {
-      const obj: any = { month };
+    const stackedStatusData = Array.from(stackedDataMap.entries()).map(([status, monthsMap]) => {
+      const obj: any = { status };
       let total = 0;
-      usedStatuses.forEach(status => {
-        const count = stackedDataMap.get(status)?.get(month)?.size || 0;
-        if (count > 0) {
-          obj[status] = count;
-        }
+      availableMonths.forEach(month => {
+        const count = monthsMap.get(month)?.size || 0;
+        obj[month] = count;
+        total += count;
       });
+      obj.total = total;
       return obj;
-    });
+    }).filter((d: any) => d.total > 0).sort((a: any, b: any) => b.total - a.total);
 
     // Broker Processing
     let brokerTimeData = rawData.tmaData;
@@ -798,7 +787,7 @@ export function useInternoDashboard(filters: DashboardFilters) {
     }
 
     return {
-      statusData, funnelData, stackedStatusData, stackedChartStatuses: usedStatuses, availableMonths,
+      statusData, funnelData, stackedStatusData, availableMonths,
       brokerTimeData, brokerActionsData, originData, cancelReasons,
       brokerLeads, lineData: sortedLineData, lineChartKeys, totalLeads,
       hottestStatusData, hottestLeadsList, allLeadsList, hasSpecificCompetences,
